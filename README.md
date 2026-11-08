@@ -43,7 +43,7 @@ npm run build
 
 ## 配置
 
-模型、提取、召回、Dream、用户画像、工具、白名单等配置沿用 LivingMemory 的完整 Schema。新增平台/身份配置将在后续阶段加入。
+模型、提取、召回、Dream、用户画像、工具、白名单等配置沿用 LivingMemory 的完整 Schema；平台筛选、身份合并、DSH HTTP API 与迁移导入导出已加入当前版本。
 
 当前已加入：
 

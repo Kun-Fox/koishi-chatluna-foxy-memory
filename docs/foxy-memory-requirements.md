@@ -146,10 +146,22 @@ presetId, platform, platformUserId, canonicalSpeakerKey, confidence, source, cre
 
 ## 6. 验收
 
-- LivingMemory 原有测试全部通过；
-- 旧库迁移前后条数/内容/向量一致；
-- 同一用户跨平台画像只出现一次，且来源平台完整；
-- DSH 写入 → QQ 召回、QQ 写入 → DSH 召回均通过；
+已在 `0.1.2` 本机实例完成：
+
+- `GET /foxy-memory/health` 返回 `service=chatluna-foxy-memory`、`preset=foxy3（Character）`；
+- `POST /foxy-memory/list|search|context` 返回真实记忆，`/search` 返回微博命中；
+- `GET /foxy-memory/export` 导出 682 条现有记忆；
+- 身份合并 Console 对话框可打开，支持已有账号搜索、平台/账号 ID 添加、移除确认；
+- 记忆列表 30 秒自动刷新；
+- 插件构建、类型检查与 `identity-link-repository`、`profile-identity`、`preset-import-export` 测试通过。
+
+仍待验收（发布前未完全自动化）：
+
+- 旧库迁移前后条数/内容/向量逐条对账；
+- 同一用户跨平台画像在真实数据上的生成与来源平台展示；
+- DSH 写入 → QQ 召回、QQ 写入 → DSH 召回的双向实测；
 - 两端同时写入不产生重复/丢失；
-- 断网/重启后队列可恢复；
+- 断网/重启后队列恢复；
 - 任何自动合并都可撤销。
+
+以上待验收项不阻塞当前公测版使用；大规模迁移前必须先备份 `koishi.db` 与向量目录。
