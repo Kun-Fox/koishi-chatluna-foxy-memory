@@ -2,7 +2,7 @@
 
 Foxy 的跨平台长期记忆插件。以 Koishi + ChatLuna + Character 为 QQ 侧入口，同时为 DSH、微博、B站等外部平台预留统一记忆来源与用户身份。
 
-> 状态：**设计/基础阶段**。本仓库已经 fork LivingMemory 的完整 MIT 源码作为兼容底座，但跨平台身份、画像合并、DSH 直连与热更新仍在实施中。不要把当前版本当作 LivingMemory 的完整替代品直接上线。
+> 状态：**公测版（已在本机 Koishi 实例接管）**。本仓库 fork 了 LivingMemory 的完整 MIT 源码作为兼容底座；平台筛选、身份链接、画像合并、DSH HTTP 直连、迁移用导出/导入和 DSH 记忆 UI 已可用。热更新、全量功能回归和 DSH↔QQ 双向验收仍在进行，暂不应在未备份的生产记忆库上直接替换旧插件。
 
 ## 与 LivingMemory 的关系
 

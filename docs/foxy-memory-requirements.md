@@ -1,6 +1,6 @@
 # Foxy Memory 需求与实施矩阵
 
-> 状态：**设计/基础阶段**。本文件逐条对应用户提出的 15 项要求，避免后续实现遗漏。
+> 状态：**公测版（已在本机实例接管）**。本文件逐条对应用户提出的 15 项要求；平台筛选、身份链接、画像合并、DSH HTTP 直连和迁移导出/导入已落地，热更新与全量回归仍未完成。
 > 本仓库当前以 `koishi-plugin-chatluna-livingmemory` 的 MIT 源码为兼容底座；`LivingMemory` 已停止作为长期依赖，仅保留迁移与对照用途。
 
 ## 0. 总体结论
@@ -11,19 +11,19 @@
 
 | # | 要求 | 设计 | 当前状态 |
 |---|------|------|----------|
-| 1 | 完整保留 LivingMemory 全部功能与 Console 配置页 | 以 MIT 源码 fork 为底座，保留原服务、命令、工具、Dream、向量索引、WebUI | 源码已 fork；包名/Console 入口已改；server/client 构建与类型检查通过，功能回归待逐项 |
+| 1 | 完整保留 LivingMemory 全部功能与 Console 配置页 | 以 MIT 源码 fork 为底座，保留原服务、命令、工具、Dream、向量索引、WebUI | 源码已 fork；包名/Console 入口已改；构建/类型检查通过；插件已在本机实例加载，功能回归待逐项 |
 | 2 | 平台筛选 + 用户匹配 | `sourceConversationId` 派生 `platform`；新增身份链接表 `foxy_identity_link` | 平台派生/筛选、身份链接表、Repository、RPC、画像卡片“身份合并”对话框已完成；默认不自动匹配，只合并人工添加的账号 |
 | 3 | 跨平台记忆整合进用户画像，画像显示来源平台 | 以 `canonicalSpeakerKey` 聚合 profile；profile 记录来源平台集合 | 画像列表与提示注入均读取 `identity_links` 合并；卡片显示来源平台；画像记录级持久合并未完成 |
 | 4 | 预设 ID 选择保持不变 | 保留原 `presetId` 作用域 | 保留 |
-| 5 | Koishi 设置只管 QQ 侧 | 新插件不读写 `~/.dsh/foxy`；DSH 侧由 `dsh-foxy-memory` 自管 | 设计已定；代码待隔离 |
+| 5 | Koishi 设置只管 QQ 侧 | 新插件不读写 `~/.dsh/foxy`；DSH 侧由 `dsh-foxy-memory` 自管 | 已按独立 `koishi.yml` 配置运行；未读写 `~/.dsh/foxy` |
 | 6 | 更高效存储 + 全量迁移 | 保留 Koishi DB + PGlite 向量索引；新增平台/身份列与迁移任务；导出/导入校验 | 迁移设计完成；代码未完成 |
-| 7 | 适配 DSH foxy-memory / foxy-daily、ChatLuna / Character | 统一 `MemoryEvent` HTTP/服务契约；QQ 侧适配器作为独立子插件 | `/foxy-memory/record|ingest|context|health` 已实现；`dsh-foxy-memory` 直连验证未完成 |
-| 8 | DSH ↔ QQ 直接往返，可舍弃旧 bridge | 新插件暴露 `/foxy-memory/*`；DSH provider 直连；旧 bridge 仅保留迁移兼容 | 新插件 HTTP 兼容层已完成；旧 bridge 退役与双向验证未完成 |
-| 9 | `dsh-foxy-memory` 重做为同等 UI | DSH 设置页增加平台/来源/写入状态/调试；QQ 侧不反向管理 | 未实现 |
+| 7 | 适配 DSH foxy-memory / foxy-daily、ChatLuna / Character | 统一 `MemoryEvent` HTTP/服务契约；QQ 侧适配器作为独立子插件 | `/foxy-memory/record|ingest|context|list|search|export|import` 已运行；DSH provider 已可直连，foxy-daily 端到端待验证 |
+| 8 | DSH ↔ QQ 直接往返，可舍弃旧 bridge | 新插件暴露 `/foxy-memory/*`；DSH provider 直连；旧 bridge 仅保留迁移兼容 | 新插件已接管 5140；旧 bridge 已禁用；DSH→QQ 已通，QQ→DSH 写入待联调 |
+| 9 | `dsh-foxy-memory` 重做为同等 UI | DSH 设置页增加平台/来源/写入状态/调试；QQ 侧不反向管理 | `dsh-foxy-memory@0.4.0` 已加侧栏、平台筛选、搜索/归档与 `/api/dsh-foxy-memory/*` |
 | 10 | 两端热读写、实时刷新、不冲突 | 文件/DB 变更监听 + 版本号 + 单写者队列；冲突检测 | 未实现 |
 | 11 | 逐项核对 LivingMemory 全部代码 | 以 `src/` 130 文件为审计基线，建立功能清单 | 已建立源码基线；审计进行中 |
 | 12 | 提出隐患与可完善点 | 见“风险”章节 | 初版已完成 |
-| 13 | 修改相关插件 README，声明 LivingMemory 退役与灵感来源 | 本仓库 README + 各 dsh-foxy README | 本仓库已完成；其余待改 |
+| 13 | 修改相关插件 README，声明 LivingMemory 退役与灵感来源 | 本仓库 README + 各 dsh-foxy README | 本仓库与 dsh-foxy 系列 README 已完成 |
 | 14 | 为未来平台留设计空间 | 平台注册表 + `MemoryEvent` + adapter 接口 | 契约已起草 |
 | 15 | 反复检查，一项不漏 | 以本矩阵为验收清单，逐项测试 | 进行中 |
 
