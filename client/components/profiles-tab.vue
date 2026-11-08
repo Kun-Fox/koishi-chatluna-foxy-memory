@@ -19,6 +19,18 @@
                             <h3 class="profile-card-title">
                                 {{ profile.speakerLabel }}
                             </h3>
+                            <div
+                                v-if="profile.platforms?.length"
+                                class="profile-platforms"
+                            >
+                                <span
+                                    v-for="platform in profile.platforms"
+                                    :key="platform"
+                                    class="profile-platform"
+                                >
+                                    {{ platformLabel(platform) }}
+                                </span>
+                            </div>
                         </div>
                         <span class="profile-source-count">
                             {{ profile.sourceMemoryIds.length }}
@@ -102,6 +114,16 @@ import { usePagedResource } from '../composables/use-paged-resource'
 import type { UserProfileRecord } from '../../src/contracts/memory'
 import { formatTime } from '../utils/display'
 import ProfileEditorDialog from './profile-editor-dialog.vue'
+
+const platformLabels: Record<string, string> = {
+    qq: 'QQ',
+    weibo: '微博',
+    bilibili: 'B站',
+    dsh: 'DSH'
+}
+
+const platformLabel = (platform: string) =>
+    platformLabels[platform] ?? platform
 
 const props = defineProps<{
     presetId: string

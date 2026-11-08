@@ -182,6 +182,7 @@ export interface UserProfileRecord {
     speakerLabel: string
     content: string
     sourceMemoryIds: string[]
+    platforms?: string[]
     createdAt: Date
     updatedAt: Date
 }

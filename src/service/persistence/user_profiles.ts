@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto'
 import { Context } from 'koishi'
 import type {
+    MemoryEntryRecord,
     PresetSpeakerInput,
     PresetSpeakerRecord,
     UserProfileInput,
@@ -8,6 +9,7 @@ import type {
 } from '../../contracts/memory'
 import {
     createPresetSpeakerId,
+    normalizeEntryRecord,
     normalizeOptionalString,
     normalizePresetSpeakerRecord,
     normalizeUserProfileRecord
@@ -20,6 +22,10 @@ const compareProfilesByCanonicalOrder = (
     left: UserProfileRecord,
     right: UserProfileRecord
 ) => +left.createdAt - +right.createdAt || left.id.localeCompare(right.id)
+
+const uniquePlatforms = (values: Array<string | null | undefined>) => [
+    ...new Set(values.filter((value): value is string => Boolean(value)))
+]
 
 export class LivingMemoryUserProfileRepository implements UserProfileRepository {
     constructor(
@@ -141,6 +147,32 @@ export class LivingMemoryUserProfileRepository implements UserProfileRepository 
         })
     }
 
+    private async attachPlatforms(
+        profiles: UserProfileRecord[]
+    ): Promise<UserProfileRecord[]> {
+        const ids = [
+            ...new Set(profiles.flatMap((profile) => profile.sourceMemoryIds))
+        ]
+        if (ids.length === 0) return profiles
+
+        const rows = await this.ctx.database.get('living_memory_entry', {
+            id: { $in: ids }
+        })
+        const platformById = new Map(
+            rows.map((row) => [
+                row.id,
+                normalizeEntryRecord(row as MemoryEntryRecord).platform
+            ])
+        )
+
+        return profiles.map((profile) => ({
+            ...profile,
+            platforms: uniquePlatforms(
+                profile.sourceMemoryIds.map((id) => platformById.get(id))
+            )
+        }))
+    }
+
     async listUserProfilesByPreset(
         presetId: string
     ): Promise<UserProfileRecord[]> {
@@ -149,11 +181,11 @@ export class LivingMemoryUserProfileRepository implements UserProfileRepository 
             { presetId }
         )
 
-        return profiles
-            .map(normalizeUserProfileRecord)
-            .sort((left, right) =>
-                left.speakerLabel.localeCompare(right.speakerLabel)
-            )
+        return (
+            await this.attachPlatforms(profiles.map(normalizeUserProfileRecord))
+        ).sort((left, right) =>
+            left.speakerLabel.localeCompare(right.speakerLabel)
+        )
     }
 
     async listUserProfilesBySpeakerKeys(
@@ -177,9 +209,9 @@ export class LivingMemoryUserProfileRepository implements UserProfileRepository 
 
         // 同一 speakerKey 可能残留重复行，规范行的口径必须与
         // replaceUserProfile 的写入目标一致，否则读到的画像不是最后写入的那行。
-        return profiles
-            .map(normalizeUserProfileRecord)
-            .sort(compareProfilesByCanonicalOrder)
+        return (
+            await this.attachPlatforms(profiles.map(normalizeUserProfileRecord))
+        ).sort(compareProfilesByCanonicalOrder)
     }
 
     async replaceUserProfile(presetId: string, profile: UserProfileInput) {
