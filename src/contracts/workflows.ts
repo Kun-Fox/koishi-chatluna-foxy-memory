@@ -106,6 +106,9 @@ export interface LivingMemoryConfig {
     memorySearchToolMaxResults: number
     memorySearchMinSimilarity: number
     identityAliases?: string[]
+    foxyApiEnabled?: boolean
+    foxyApiToken?: string
+    foxyApiDefaultPresetId?: string
     enabledMemoryTools: string[]
     memoryCreateToolMaxMemories: number
     debug: boolean

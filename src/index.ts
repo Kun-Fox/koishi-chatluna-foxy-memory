@@ -5,6 +5,7 @@ import { apply as characterMiddlewarePlugin } from './plugins/character_middlewa
 import { apply as chatMiddlewarePlugin } from './plugins/chat_middleware'
 import { apply as livingMemoryToolsPlugin } from './plugins/living_memory_tools'
 import { apply as livingMemoryCommandsPlugin } from './plugins/commands'
+import { apply as foxyApiPlugin } from './plugins/foxy_api'
 import {
     registerEntry as registerWebUIEntry,
     apply as webuiPlugin
@@ -27,6 +28,9 @@ export function apply(ctx: Context, config: Config) {
 
     ctx.inject(['chatluna_living_memory'], (ctx) => {
         livingMemoryCommandsPlugin(ctx)
+        if (config.foxyApiEnabled) {
+            foxyApiPlugin(ctx, config)
+        }
         void chatMiddlewarePlugin(ctx, config)
         livingMemoryToolsPlugin(ctx, config)
 
@@ -206,7 +210,19 @@ export const Config: Schema<Config> = Schema.intersect([
             .role('table')
             .description('自动提取白名单：群聊填群号，私聊填对方 QQ 号。')
             .default([])
-    }).description('记忆提取配置')
+    }).description('记忆提取配置'),
+    Schema.object({
+        foxyApiEnabled: Schema.boolean()
+            .description('启用 DSH / 跨平台记忆 HTTP API（/foxy-memory/*）。')
+            .default(false),
+        foxyApiToken: Schema.string()
+            .role('secret')
+            .description('API Bearer Token；留空时只允许本机访问。')
+            .default(''),
+        foxyApiDefaultPresetId: Schema.string()
+            .description('请求未指定 presetId 时使用的记忆池。')
+            .default('foxy3（Character）')
+    }).description('DSH 记忆 API')
 ])
 
 export * from './types'

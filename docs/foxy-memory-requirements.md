@@ -11,14 +11,14 @@
 
 | # | 要求 | 设计 | 当前状态 |
 |---|------|------|----------|
-| 1 | 完整保留 LivingMemory 全部功能与 Console 配置页 | 以 MIT 源码 fork 为底座，保留原服务、命令、工具、Dream、向量索引、WebUI | 源码已 fork；包名/入口已改；尚未完成构建与回归 |
-| 2 | 平台筛选 + 用户匹配 | `sourceConversationId` 派生 `platform`；新增身份链接表 `foxy_identity_link` | 平台派生/筛选后端与记忆页筛选已加；身份链接/画像合并未完成 |
-| 3 | 跨平台记忆整合进用户画像，画像显示来源平台 | 以 `canonicalSpeakerKey` 聚合 profile；profile 记录来源平台集合 | 未实现 |
+| 1 | 完整保留 LivingMemory 全部功能与 Console 配置页 | 以 MIT 源码 fork 为底座，保留原服务、命令、工具、Dream、向量索引、WebUI | 源码已 fork；包名/Console 入口已改；server/client 构建与类型检查通过，功能回归待逐项 |
+| 2 | 平台筛选 + 用户匹配 | `sourceConversationId` 派生 `platform`；新增身份链接表 `foxy_identity_link` | 平台派生/筛选与身份别名注入合并已完成；独立身份链接表未落库 |
+| 3 | 跨平台记忆整合进用户画像，画像显示来源平台 | 以 `canonicalSpeakerKey` 聚合 profile；profile 记录来源平台集合 | 别名注入合并完成；画像记录级合并与来源平台展示未完成 |
 | 4 | 预设 ID 选择保持不变 | 保留原 `presetId` 作用域 | 保留 |
 | 5 | Koishi 设置只管 QQ 侧 | 新插件不读写 `~/.dsh/foxy`；DSH 侧由 `dsh-foxy-memory` 自管 | 设计已定；代码待隔离 |
 | 6 | 更高效存储 + 全量迁移 | 保留 Koishi DB + PGlite 向量索引；新增平台/身份列与迁移任务；导出/导入校验 | 迁移设计完成；代码未完成 |
-| 7 | 适配 DSH foxy-memory / foxy-daily、ChatLuna / Character | 统一 `MemoryEvent` HTTP/服务契约；QQ 侧适配器作为独立子插件 | 契约设计完成；适配器未完成 |
-| 8 | DSH ↔ QQ 直接往返，可舍弃旧 bridge | 新插件暴露 `/foxy-memory/v1/*`；DSH provider 直连；旧 bridge 仅保留迁移兼容 | 未实现 |
+| 7 | 适配 DSH foxy-memory / foxy-daily、ChatLuna / Character | 统一 `MemoryEvent` HTTP/服务契约；QQ 侧适配器作为独立子插件 | `/foxy-memory/record|ingest|context|health` 已实现；`dsh-foxy-memory` 直连验证未完成 |
+| 8 | DSH ↔ QQ 直接往返，可舍弃旧 bridge | 新插件暴露 `/foxy-memory/*`；DSH provider 直连；旧 bridge 仅保留迁移兼容 | 新插件 HTTP 兼容层已完成；旧 bridge 退役与双向验证未完成 |
 | 9 | `dsh-foxy-memory` 重做为同等 UI | DSH 设置页增加平台/来源/写入状态/调试；QQ 侧不反向管理 | 未实现 |
 | 10 | 两端热读写、实时刷新、不冲突 | 文件/DB 变更监听 + 版本号 + 单写者队列；冲突检测 | 未实现 |
 | 11 | 逐项核对 LivingMemory 全部代码 | 以 `src/` 130 文件为审计基线，建立功能清单 | 已建立源码基线；审计进行中 |
@@ -87,6 +87,19 @@ presetId, platform, platformUserId, canonicalSpeakerKey, confidence, source, cre
 - 向量：PGlite + pgvector，保留原目录所有权与重建能力。
 - 记忆正文：不引入第二套 JSONL 作为主存储；DSH 侧缓存只做离线队列。
 - 热更新：单写者队列 + `updatedAt`/revision；文件监听只触发刷新，不直接写库。
+
+### 2.5 DSH HTTP 兼容层
+
+`src/plugins/foxy_api.ts` 提供与旧 `foxy-memory-bridge` 同路径的接口：
+
+- `GET /foxy-memory/health`
+- `POST /foxy-memory/record`
+- `POST /foxy-memory/ingest`
+- `POST /foxy-memory/context`
+
+请求支持 `presetId`、`sessionId`、`conversationId`、`platform`、`channelType`、`channelId`、`eventType`、`sourceLabel`、`messages[]`。`/context` 同时返回 `text` 与 `memories`，因此 `dsh-foxy-memory` 的旧 provider 可以直接指向本插件，无需旧 bridge 进程。
+
+安全默认：`foxyApiEnabled` 默认关闭；开启后 `foxyApiToken` 为空时只接受本机回环请求。跨机部署必须配置 Bearer Token。
 
 ## 3. 迁移
 
