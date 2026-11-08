@@ -49,6 +49,7 @@ npm run build
 
 - 记忆列表的“平台来源”筛选（QQ / 微博 / B站 / DSH）。
 - 记忆记录从 `sourceConversationId` 派生平台，不依赖旧 `sourceLabel` 字段。
+- 跨平台身份别名：配置 `identityAliases`，每项用逗号分隔，首项为统一展示名，例如 `kunfox,nogitsune,小狐狸`。画像注入按统一身份合并展示；数据库中的画像记录仍保留原 speakerKey，便于回溯。
 
 ## 迁移原则
 
