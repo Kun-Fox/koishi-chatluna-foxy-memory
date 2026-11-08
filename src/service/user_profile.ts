@@ -17,6 +17,10 @@ import { buildUserProfilePrompts } from './prompts/user_profile'
 import { invokeStructuredOutput } from './workflows/structured_output'
 import { formatLogScope, type LivingMemoryLogger } from './logging/logger'
 import { normalizeSpeakerKeys } from './memory/speaker_identity'
+import {
+    buildIdentityAliasMap,
+    resolveIdentityLabel
+} from './memory/identity_aliases'
 import { SerialTaskQueue } from './shared/serial_task_queue'
 
 export const normalizeManualUserProfileContent = (content: string) => {
@@ -32,6 +36,7 @@ type LivingMemoryUserProfileConfig = Pick<
     | 'enableUserProfileInjection'
     | 'userProfileMinMemoryCount'
     | 'userProfileMemoryLimit'
+    | 'identityAliases'
 >
 
 export interface UserProfileGenerationResult {
@@ -444,23 +449,61 @@ export class LivingMemoryUserProfileService {
             return ''
         }
 
-        const profiles = await this.repository.listUserProfilesBySpeakerKeys(
-            presetId,
-            orderedKeys
-        )
-        const profileByKey = new Map(
-            profiles.map((profile) => [profile.speakerKey, profile])
-        )
-
-        return orderedKeys
-            .map((key) => profileByKey.get(key))
-            .filter((profile): profile is NonNullable<typeof profile> => {
-                return profile != null && profile.content.trim().length > 0
-            })
-            .map(
-                (profile) =>
-                    `${profile.speakerLabel}的人物画像：\n${profile.content}`
+        const aliases = buildIdentityAliasMap(this.config.identityAliases)
+        const profiles =
+            aliases.size > 0
+                ? await this.repository.listUserProfilesByPreset(presetId)
+                : await this.repository.listUserProfilesBySpeakerKeys(
+                      presetId,
+                      orderedKeys
+                  )
+        if (aliases.size === 0) {
+            const profileByKey = new Map(
+                profiles.map((profile) => [profile.speakerKey, profile])
             )
+
+            return orderedKeys
+                .map((key) => profileByKey.get(key))
+                .filter((profile): profile is NonNullable<typeof profile> => {
+                    return profile != null && profile.content.trim().length > 0
+                })
+                .map(
+                    (profile) =>
+                        `${profile.speakerLabel}的人物画像：\n${profile.content}`
+                )
+                .join('\n\n')
+        }
+
+        const canonicalByKey = new Map(
+            orderedKeys.map((key) => [
+                key,
+                aliases.get(key) ?? key
+            ])
+        )
+        const wanted = new Set(canonicalByKey.values())
+        const groups = new Map<string, UserProfileRecord[]>()
+        for (const profile of profiles) {
+            const canonical = resolveIdentityLabel(
+                profile.speakerKey,
+                profile.speakerLabel,
+                aliases
+            )
+            if (!wanted.has(canonical)) continue
+            const group = groups.get(canonical) ?? []
+            group.push(profile)
+            groups.set(canonical, group)
+        }
+
+        return [...groups.entries()]
+            .map(([label, group]) => {
+                const content = group
+                    .map((profile) => profile.content.trim())
+                    .filter(Boolean)
+                    .join('\n')
+                if (!content) return ''
+                return `${label}的人物画像：\n${content}`
+            })
+            .filter(Boolean)
             .join('\n\n')
     }
 }

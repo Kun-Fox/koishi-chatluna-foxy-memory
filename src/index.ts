@@ -125,7 +125,12 @@ export const Config: Schema<Config> = Schema.intersect([
             .description(
                 'living_memory_create_memory 单次调用最多创建的记忆条数。'
             )
-            .default(10)
+            .default(10),
+        identityAliases: Schema.array(Schema.string())
+            .description(
+                '跨平台身份别名。每项用逗号分隔，首项为统一展示名，例如“kunfox,nogitsune,小狐狸”。'
+            )
+            .default([])
     }).description('工具配置'),
     Schema.object({
         enableUserProfileInjection: Schema.boolean()

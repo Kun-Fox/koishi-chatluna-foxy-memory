@@ -105,6 +105,7 @@ export interface LivingMemoryConfig {
     extractionWhitelist: string[]
     memorySearchToolMaxResults: number
     memorySearchMinSimilarity: number
+    identityAliases?: string[]
     enabledMemoryTools: string[]
     memoryCreateToolMaxMemories: number
     debug: boolean
