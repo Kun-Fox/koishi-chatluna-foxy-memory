@@ -96,7 +96,7 @@ export function apply(ctx: Context, config: LivingMemoryConfig) {
         const service = (): ChatLunaLivingMemoryService =>
             ctx.chatluna_living_memory
 
-        ctx.server.get('/foxy-memory/health', async (koa) => {
+        ctx.server.get('/foxy-memory/health', async (koa: any) => {
             koa.body = {
                 ok: true,
                 service: 'chatluna-foxy-memory',
@@ -104,7 +104,7 @@ export function apply(ctx: Context, config: LivingMemoryConfig) {
             }
         })
 
-        ctx.server.post('/foxy-memory/record', async (koa) => {
+        ctx.server.post('/foxy-memory/record', async (koa: any) => {
             const token = String(koa.headers.authorization ?? '').replace(
                 /^Bearer\s+/iu,
                 ''
@@ -135,7 +135,7 @@ export function apply(ctx: Context, config: LivingMemoryConfig) {
             koa.body = { ok: true, created: 1, ids: [memory.id] }
         })
 
-        ctx.server.post('/foxy-memory/ingest', async (koa) => {
+        ctx.server.post('/foxy-memory/ingest', async (koa: any) => {
             const token = String(koa.headers.authorization ?? '').replace(
                 /^Bearer\s+/iu,
                 ''
@@ -175,7 +175,7 @@ export function apply(ctx: Context, config: LivingMemoryConfig) {
             koa.body = { ok: true, created: ids.length, ids }
         })
 
-        ctx.server.post('/foxy-memory/send-private', async (koa) => {
+        ctx.server.post('/foxy-memory/send-private', async (koa: any) => {
             const token = String(koa.headers.authorization ?? '').replace(
                 /^Bearer\s+/iu,
                 ''
@@ -229,7 +229,7 @@ export function apply(ctx: Context, config: LivingMemoryConfig) {
             }
         })
 
-        ctx.server.get('/foxy-memory/export', async (koa) => {
+        ctx.server.get('/foxy-memory/export', async (koa: any) => {
             const token = String(koa.headers.authorization ?? '').replace(
                 /^Bearer\s+/iu,
                 ''
@@ -245,7 +245,7 @@ export function apply(ctx: Context, config: LivingMemoryConfig) {
             koa.body = { ok: true, presetId, data }
         })
 
-        ctx.server.post('/foxy-memory/import', async (koa) => {
+        ctx.server.post('/foxy-memory/import', async (koa: any) => {
             const token = String(koa.headers.authorization ?? '').replace(
                 /^Bearer\s+/iu,
                 ''
@@ -273,7 +273,7 @@ export function apply(ctx: Context, config: LivingMemoryConfig) {
             koa.body = { ok: true, targetPresetId, ...result }
         })
 
-        ctx.server.post('/foxy-memory/list', async (koa) => {
+        ctx.server.post('/foxy-memory/list', async (koa: any) => {
             const token = String(koa.headers.authorization ?? '').replace(
                 /^Bearer\s+/iu,
                 ''
@@ -303,7 +303,7 @@ export function apply(ctx: Context, config: LivingMemoryConfig) {
             koa.body = { ok: true, ...result }
         })
 
-        ctx.server.post('/foxy-memory/search', async (koa) => {
+        ctx.server.post('/foxy-memory/search', async (koa: any) => {
             const token = String(koa.headers.authorization ?? '').replace(
                 /^Bearer\s+/iu,
                 ''
@@ -342,7 +342,7 @@ export function apply(ctx: Context, config: LivingMemoryConfig) {
             }
         })
 
-        ctx.server.post('/foxy-memory/context', async (koa) => {
+        ctx.server.post('/foxy-memory/context', async (koa: any) => {
             const token = String(koa.headers.authorization ?? '').replace(
                 /^Bearer\s+/iu,
                 ''
