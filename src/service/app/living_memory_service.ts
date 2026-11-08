@@ -673,13 +673,16 @@ export class ChatLunaLivingMemoryService extends Service<LivingMemoryConfig> {
             query.presetId
         )
         const links = await this.repository.listIdentityLinks(query.presetId)
-        const linkGroups = links.map((link) => [
-            link.canonicalSpeakerKey,
-            createSpeakerKey(link.platform, link.platformUserId)
-        ])
+        const linkGroups = links.map(
+            (link) =>
+                `${link.canonicalSpeakerKey},${createSpeakerKey(
+                    link.platform,
+                    link.platformUserId
+                )}`
+        )
         return filterUserProfileList(
             mergeUserProfilesByIdentity(items, [
-                ...this.config.identityAliases,
+                ...(this.config.identityAliases ?? []),
                 ...linkGroups
             ]),
             query

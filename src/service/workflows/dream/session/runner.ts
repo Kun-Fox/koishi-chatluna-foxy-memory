@@ -12,7 +12,7 @@ import {
     ToolInputParsingException,
     type StructuredTool
 } from '@langchain/core/tools'
-import { isRequestFailure } from 'koishi-plugin-chatluna/utils/error'
+import { isRequestFailure } from '../../../shared/request_failure'
 import type { DreamBatch } from '../types'
 import type { refreshPostExtractionDreamBatch } from '../post_extraction'
 import { MemoryInputError } from '../../../memory/errors'

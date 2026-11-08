@@ -1,4 +1,4 @@
-import { isRequestFailure } from 'koishi-plugin-chatluna/utils/error'
+import { isRequestFailure } from '../shared/request_failure'
 import { createHash, randomUUID } from 'crypto'
 import type { Context } from 'koishi'
 import type { ChatLunaChatModel } from 'koishi-plugin-chatluna/llm-core/platform/model'
