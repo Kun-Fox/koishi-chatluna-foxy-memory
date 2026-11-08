@@ -8,7 +8,7 @@
 ## 代码文件结构
 
 ```text
-chatluna-livingmemory/
+chatluna-foxy-memory/
 ├── src/
 │   ├── index.ts                         # 插件入口、配置 schema 与集成装配
 │   ├── query.ts                         # 对外记忆查询接口
@@ -24,6 +24,7 @@ chatluna-livingmemory/
 │   │   ├── chat_middleware.ts           # ChatLuna 对话生命周期接入
 │   │   ├── character_middleware.ts      # Character 对话生命周期接入
 │   │   ├── commands.ts                  # 管理指令
+│   │   ├── foxy_api.ts                  # DSH / 跨平台记忆 HTTP API
 │   │   ├── living_memory_tools.ts       # 主对话记忆工具注册
 │   │   └── webui.ts                     # Console 页面与 RPC 注册
 │   └── service/
