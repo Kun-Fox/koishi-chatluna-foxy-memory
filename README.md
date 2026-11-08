@@ -50,7 +50,8 @@ npm run build
 - 记忆列表的“平台来源”筛选（QQ / 微博 / B站 / DSH）。
 - 记忆记录从 `sourceConversationId` 派生平台，不依赖旧 `sourceLabel` 字段。
 - 跨平台身份别名：配置 `identityAliases`，每项用逗号分隔，首项为统一展示名，例如 `用户,nogitsune,小狐狸`。画像注入按统一身份合并展示；数据库中的画像记录仍保留原 speakerKey，便于回溯。
-- DSH / 跨平台 HTTP API（默认关闭）：开启 `foxyApiEnabled` 后提供 `/foxy-memory/health`、`/record`、`/ingest`、`/context`。`foxyApiToken` 留空时只允许本机访问；跨机调用必须设置 Bearer Token。默认写入 `foxyApiDefaultPresetId`（默认 `preset（Character）`）。
+- DSH / 跨平台 HTTP API（默认关闭）：开启 `foxyApiEnabled` 后提供 `/foxy-memory/health`、`/record`、`/ingest`、`/context`、`/list`、`/search`、`/send-private`，以及用于迁移的 `/export`、`/import`。`foxyApiToken` 留空时只允许本机访问；跨机调用必须设置 Bearer Token。默认写入 `foxyApiDefaultPresetId`（默认 `preset（Character）`）。
+- 迁移旧数据：先用 `GET /foxy-memory/export?presetId=<旧池>` 导出 JSON，再用 `POST /foxy-memory/import`（body `{targetPresetId,data}`）导入新池；导入会保留记忆正文、类型、关键词、来源、时间与画像，并重建向量索引。
 
 ### DSH 接入
 

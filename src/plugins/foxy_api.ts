@@ -229,6 +229,50 @@ export function apply(ctx: Context, config: LivingMemoryConfig) {
             }
         })
 
+        ctx.server.get('/foxy-memory/export', async (koa) => {
+            const token = String(koa.headers.authorization ?? '').replace(
+                /^Bearer\s+/iu,
+                ''
+            )
+            if (!authorized(config, token, koa.req?.socket?.remoteAddress)) {
+                koa.status = 401
+                koa.body = { ok: false, error: 'unauthorized' }
+                return
+            }
+            const presetId =
+                String(koa.query?.presetId ?? '').trim() || defaultPreset(config)
+            const data = await service().exportPreset(presetId)
+            koa.body = { ok: true, presetId, data }
+        })
+
+        ctx.server.post('/foxy-memory/import', async (koa) => {
+            const token = String(koa.headers.authorization ?? '').replace(
+                /^Bearer\s+/iu,
+                ''
+            )
+            if (!authorized(config, token, koa.req?.socket?.remoteAddress)) {
+                koa.status = 401
+                koa.body = { ok: false, error: 'unauthorized' }
+                return
+            }
+            const payload = (koa.request.body ?? {}) as {
+                targetPresetId?: string
+                data?: unknown
+            }
+            const targetPresetId =
+                payload.targetPresetId?.trim() || defaultPreset(config)
+            const data = payload.data as Parameters<
+                ChatLunaLivingMemoryService['importPreset']
+            >[1]
+            if (!data || typeof data !== 'object') {
+                koa.status = 400
+                koa.body = { ok: false, error: 'data is required' }
+                return
+            }
+            const result = await service().importPreset(targetPresetId, data)
+            koa.body = { ok: true, targetPresetId, ...result }
+        })
+
         ctx.server.post('/foxy-memory/list', async (koa) => {
             const token = String(koa.headers.authorization ?? '').replace(
                 /^Bearer\s+/iu,
