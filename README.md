@@ -49,8 +49,8 @@ npm run build
 
 - 记忆列表的“平台来源”筛选（QQ / 微博 / B站 / DSH）。
 - 记忆记录从 `sourceConversationId` 派生平台，不依赖旧 `sourceLabel` 字段。
-- 跨平台身份别名：配置 `identityAliases`，每项用逗号分隔，首项为统一展示名，例如 `kunfox,nogitsune,小狐狸`。画像注入按统一身份合并展示；数据库中的画像记录仍保留原 speakerKey，便于回溯。
-- DSH / 跨平台 HTTP API（默认关闭）：开启 `foxyApiEnabled` 后提供 `/foxy-memory/health`、`/record`、`/ingest`、`/context`。`foxyApiToken` 留空时只允许本机访问；跨机调用必须设置 Bearer Token。默认写入 `foxyApiDefaultPresetId`（默认 `foxy3（Character）`）。
+- 跨平台身份别名：配置 `identityAliases`，每项用逗号分隔，首项为统一展示名，例如 `用户,nogitsune,小狐狸`。画像注入按统一身份合并展示；数据库中的画像记录仍保留原 speakerKey，便于回溯。
+- DSH / 跨平台 HTTP API（默认关闭）：开启 `foxyApiEnabled` 后提供 `/foxy-memory/health`、`/record`、`/ingest`、`/context`。`foxyApiToken` 留空时只允许本机访问；跨机调用必须设置 Bearer Token。默认写入 `foxyApiDefaultPresetId`（默认 `preset（Character）`）。
 
 ### DSH 接入
 
@@ -61,7 +61,7 @@ DSH 侧仍使用 `dsh-foxy-memory`，把 `bridgeUrl` 指向本插件的 `/foxy-m
   "provider": "livingmemory",
   "bridgeUrl": "http://127.0.0.1:5140/foxy-memory",
   "bridgeToken": "",
-  "bridgePresetId": "foxy3（Character）"
+  "bridgePresetId": "preset（Character）"
 }
 ```
 
