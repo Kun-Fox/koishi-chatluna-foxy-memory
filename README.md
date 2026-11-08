@@ -2,7 +2,7 @@
 
 Foxy 的跨平台长期记忆插件。以 Koishi + ChatLuna + Character 为 QQ 侧入口，同时为 DSH、微博、B站等外部平台预留统一记忆来源与用户身份。
 
-> 状态：**公测版（已在本机 Koishi 实例接管）**。本仓库 fork 了 LivingMemory 的完整 MIT 源码作为兼容底座；平台筛选、身份链接、画像合并、DSH HTTP 直连、迁移用导出/导入和 DSH 记忆 UI 已可用。热更新、全量功能回归和 DSH↔QQ 双向验收仍在进行，暂不应在未备份的生产记忆库上直接替换旧插件。
+> 状态：**公测版（已在本机 Koishi 实例接管）**。本仓库 fork 了 LivingMemory 的完整 MIT 源码作为兼容底座；平台筛选、身份链接、画像合并、DSH HTTP 直连、迁移用导出/导入、DSH 记忆 UI、记忆列表实时刷新均已可用。Dream/向量索引继承原项目单写者队列；大规模迁移前仍应先备份 `koishi.db` 与向量目录。
 
 ## 与 LivingMemory 的关系
 
@@ -17,7 +17,7 @@ Foxy 的跨平台长期记忆插件。以 Koishi + ChatLuna + Character 为 QQ �
 - 记忆按平台/来源筛选；同一用户跨平台合并为统一画像，并展示来源平台。
 - 结构化 `FoxyMemoryEvent`，避免把“被 @ 后回复”写成“我刷到”。
 - DSH 与 QQ 侧双向读写，旧 memory bridge 可退役。
-- 两端记忆热更新、实时刷新、冲突检测。
+- 两端记忆热更新、实时刷新与单写者事务；Console 记忆列表每 30 秒自动刷新，外部写入无需重启。
 - 为微博、B站、未来平台保留适配器接口。
 
 详细需求矩阵、架构、迁移与风险见：
@@ -49,7 +49,7 @@ npm run build
 
 - 记忆列表的“平台来源”筛选（QQ / 微博 / B站 / DSH）。
 - 记忆记录从 `sourceConversationId` 派生平台，不依赖旧 `sourceLabel` 字段。
-- 跨平台身份别名：配置 `identityAliases`，每项用逗号分隔，首项为统一展示名，例如 `用户,nogitsune,小狐狸`。画像注入按统一身份合并展示；数据库中的画像记录仍保留原 speakerKey，便于回溯。
+- 跨平台身份别名：配置 `identityAliases`，每项用逗号分隔，首项为统一展示名，例如 `用户,nogitsune,小狐狸`。Console 画像页的“身份合并”可按已有账号搜索并手动加入，默认不自动合并；画像注入按统一身份合并展示，数据库中的画像记录仍保留原 speakerKey，便于回溯。
 - DSH / 跨平台 HTTP API（默认关闭）：开启 `foxyApiEnabled` 后提供 `/foxy-memory/health`、`/record`、`/ingest`、`/context`、`/list`、`/search`、`/send-private`，以及用于迁移的 `/export`、`/import`。`foxyApiToken` 留空时只允许本机访问；跨机调用必须设置 Bearer Token。默认写入 `foxyApiDefaultPresetId`（默认 `preset（Character）`）。
 - 迁移旧数据：先用 `GET /foxy-memory/export?presetId=<旧池>` 导出 JSON，再用 `POST /foxy-memory/import`（body `{targetPresetId,data}`）导入新池；导入会保留记忆正文、类型、关键词、来源、时间与画像，并重建向量索引。
 

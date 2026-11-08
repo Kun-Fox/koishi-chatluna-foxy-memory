@@ -64,7 +64,44 @@
                 </ul>
 
                 <div class="identity-add-form">
-                    <div class="identity-panel-title">添加关联账号</div>
+                    <div class="identity-panel-title">从已有账号中选择</div>
+                    <p class="identity-hint">
+                        搜索本预设中已出现的账号；点击后加入左侧主账号。
+                    </p>
+                    <el-input
+                        v-model="speakerQuery"
+                        placeholder="搜索昵称、平台或账号 ID"
+                        clearable
+                    />
+                    <div class="identity-speaker-list">
+                        <button
+                            v-for="speaker in filteredSpeakers"
+                            :key="speaker.speakerKey"
+                            type="button"
+                            class="identity-speaker-row"
+                            :disabled="saving"
+                            @click="addSpeaker(speaker)"
+                        >
+                            <span>
+                                <strong>{{ speaker.speakerLabel }}</strong>
+                                <small>
+                                    {{ platformLabel(speaker.platform || 'other') }}
+                                    · {{ speaker.speakerId || speaker.speakerKey }}
+                                </small>
+                            </span>
+                            <span class="identity-speaker-add">加入</span>
+                        </button>
+                        <p
+                            v-if="filteredSpeakers.length === 0"
+                            class="identity-hint"
+                        >
+                            没有可加入的账号
+                        </p>
+                    </div>
+                </div>
+
+                <div class="identity-add-form">
+                    <div class="identity-panel-title">手动添加平台账号</div>
                     <p class="identity-hint">
                         输入同一人的其他平台账号 ID；关联后画像会合并展示。
                     </p>
@@ -107,6 +144,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import * as api from '../api'
 import type {
     IdentityLinkRecord,
+    PresetSpeakerRecord,
     UserProfileRecord
 } from '../../src/contracts/memory'
 
@@ -137,6 +175,8 @@ const platformLabel = (platform: string) =>
     platformLabels[platform] ?? platform
 
 const links = ref<IdentityLinkRecord[]>([])
+const speakers = ref<PresetSpeakerRecord[]>([])
+const speakerQuery = ref('')
 const loading = ref(false)
 const saving = ref(false)
 const deletingId = ref<string | null>(null)
@@ -149,14 +189,47 @@ const canonicalLinks = computed(() =>
     )
 )
 
+const filteredSpeakers = computed(() => {
+    const query = speakerQuery.value.trim().toLocaleLowerCase()
+    const linked = new Set(
+        canonicalLinks.value.map(
+            (link) => `${link.platform}:${link.platformUserId}`
+        )
+    )
+    return speakers.value
+        .filter((speaker) => speaker.speakerKey !== props.profile.speakerKey)
+        .filter((speaker) => {
+            const platform = speaker.platform || 'other'
+            const accountId = speaker.speakerId || speaker.speakerKey
+            return !linked.has(`${platform}:${accountId}`)
+        })
+        .filter((speaker) => {
+            if (!query) return true
+            return [
+                speaker.speakerLabel,
+                speaker.speakerKey,
+                speaker.speakerId || '',
+                speaker.platform || ''
+            ]
+                .join(' ')
+                .toLocaleLowerCase()
+                .includes(query)
+        })
+        .slice(0, 30)
+})
+
 const loadLinks = async () => {
     if (!props.presetId) {
         links.value = []
+        speakers.value = []
         return
     }
     loading.value = true
     try {
-        links.value = await api.listIdentityLinks(props.presetId)
+        ;[links.value, speakers.value] = await Promise.all([
+            api.listIdentityLinks(props.presetId),
+            api.listPresetSpeakers(props.presetId)
+        ])
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
         ElMessage.error(`获取身份关联失败：${message}`)
@@ -174,6 +247,29 @@ watch(
         }
     }
 )
+
+const addSpeaker = async (speaker: PresetSpeakerRecord) => {
+    const platform = speaker.platform || 'other'
+    const platformUserId = speaker.speakerId || speaker.speakerKey
+    saving.value = true
+    try {
+        await api.upsertIdentityLink({
+            presetId: props.presetId,
+            platform,
+            platformUserId,
+            canonicalSpeakerKey: props.profile.speakerKey,
+            source: 'manual'
+        })
+        ElMessage.success('已加入关联账号')
+        await loadLinks()
+        emit('saved')
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        ElMessage.error(`添加失败：${message}`)
+    } finally {
+        saving.value = false
+    }
+}
 
 const addLink = async () => {
     const platformUserId = newPlatformUserId.value.trim()
@@ -312,6 +408,48 @@ const removeLink = async (link: IdentityLinkRecord) => {
 .identity-link-id {
     margin-left: 8px;
     color: var(--el-text-color-secondary);
+    font-size: 12px;
+}
+
+.identity-speaker-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 220px;
+    margin-top: 10px;
+    overflow: auto;
+}
+
+.identity-speaker-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    width: 100%;
+    padding: 9px 10px;
+    border: 1px solid var(--el-border-color-lighter);
+    border-radius: 8px;
+    background: var(--el-fill-color-blank);
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.identity-speaker-row:hover {
+    border-color: var(--el-color-primary-light-5);
+    background: var(--el-color-primary-light-9);
+}
+
+.identity-speaker-row small {
+    display: block;
+    margin-top: 3px;
+    color: var(--el-text-color-secondary);
+    font-size: 11px;
+}
+
+.identity-speaker-add {
+    flex: none;
+    color: var(--el-color-primary);
     font-size: 12px;
 }
 
