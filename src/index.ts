@@ -221,7 +221,13 @@ export const Config: Schema<Config> = Schema.intersect([
             .default(''),
         foxyApiDefaultPresetId: Schema.string()
             .description('请求未指定 presetId 时使用的记忆池。')
-            .default('foxy3（Character）')
+            .default('foxy3（Character）'),
+        foxyOwnerId: Schema.string()
+            .description('DSH 私聊推送默认接收人 QQ 号；留空时请求必须带 userId。')
+            .default(''),
+        foxyBotId: Schema.string()
+            .description('发送私聊优先使用的机器人 selfId；留空使用第一个可用 bot。')
+            .default('')
     }).description('DSH 记忆 API')
 ])
 

@@ -111,6 +111,8 @@ export interface LivingMemoryConfig {
     foxyApiEnabled?: boolean
     foxyApiToken?: string
     foxyApiDefaultPresetId?: string
+    foxyOwnerId?: string
+    foxyBotId?: string
     enabledMemoryTools: string[]
     memoryCreateToolMaxMemories: number
     debug: boolean

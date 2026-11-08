@@ -175,6 +175,60 @@ export function apply(ctx: Context, config: LivingMemoryConfig) {
             koa.body = { ok: true, created: ids.length, ids }
         })
 
+        ctx.server.post('/foxy-memory/send-private', async (koa) => {
+            const token = String(koa.headers.authorization ?? '').replace(
+                /^Bearer\s+/iu,
+                ''
+            )
+            if (!authorized(config, token, koa.req?.socket?.remoteAddress)) {
+                koa.status = 401
+                koa.body = { ok: false, error: 'unauthorized' }
+                return
+            }
+            const payload = (koa.request.body ?? {}) as {
+                userId?: string
+                selfId?: string
+                text?: string
+            }
+            const text = payload.text?.trim()
+            const target =
+                payload.userId?.trim() ||
+                config.foxyOwnerId?.trim() ||
+                ''
+            if (!text || !target) {
+                koa.status = 400
+                koa.body = { ok: false, error: 'text and userId are required' }
+                return
+            }
+            const bots = [...ctx.bots]
+            const bot =
+                bots.find((item) => item.selfId === payload.selfId) ??
+                bots.find(
+                    (item) => item.selfId === config.foxyBotId?.trim()
+                ) ??
+                bots[0]
+            if (!bot) {
+                koa.status = 503
+                koa.body = { ok: false, error: 'no bot available' }
+                return
+            }
+            try {
+                const messageIds = await bot.sendPrivateMessage(target, text)
+                koa.body = {
+                    ok: true,
+                    userId: target,
+                    botId: bot.selfId,
+                    messageIds
+                }
+            } catch (error) {
+                koa.status = 502
+                koa.body = {
+                    ok: false,
+                    error: error instanceof Error ? error.message : String(error)
+                }
+            }
+        })
+
         ctx.server.post('/foxy-memory/list', async (koa) => {
             const token = String(koa.headers.authorization ?? '').replace(
                 /^Bearer\s+/iu,
