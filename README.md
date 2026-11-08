@@ -29,7 +29,7 @@ Foxy 的跨平台长期记忆插件。以 Koishi + ChatLuna + Character 为 QQ �
 
 ```bash
 # 在 Koishi 实例根目录
-corepack yarn add "koishi-plugin-chatluna-foxy-memory@file:./koishi-plugin-chatluna-foxy-memory"
+corepack yarn add koishi-plugin-chatluna-foxy-memory
 ```
 
 构建：
