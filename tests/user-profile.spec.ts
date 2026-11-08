@@ -1,0 +1,316 @@
+import assert from 'node:assert/strict'
+import { LivingMemoryLogger } from '../src/service/logging/logger'
+import type {
+    MemoryEntryRecord,
+    UserProfileInput,
+    UserProfileRecord
+} from '../src/contracts/memory'
+import type {
+    UserProfileMemoryRepository,
+    UserProfileRepository
+} from '../src/contracts/workflows'
+import { characterPresetSuffix } from '../src/service/memory/helpers'
+import { userProfileResultTool } from '../src/service/prompts/memory_tools'
+import {
+    LivingMemoryUserProfileService,
+    normalizeManualUserProfileContent
+} from '../src/service/user_profile'
+import {
+    createToolCallingModel,
+    createToolCallMessage
+} from './tool-calling-test-utils'
+
+const now = new Date('2026-07-16T00:00:00.000Z')
+const memory: MemoryEntryRecord = {
+    id: 'memory-1',
+    presetId: 'preset-1',
+    speakerKeys: ['张三'],
+    type: 'fact',
+    status: 'active',
+    content: '张三正在准备考试。',
+    keywords: ['张三', '准备考试'],
+    summary: '张三正在准备考试',
+    sentiment: '关心',
+    importance: 0.7,
+    sourceConversationId: 'conversation-1',
+    sourceLabel: null,
+    sourceOrigins: [],
+    createdAt: now,
+    updatedAt: now
+}
+
+const createHarness = (
+    options: {
+        debug?: boolean
+        presetId?: string
+        speakerLabel?: string
+        speakerAliases?: string[]
+        userProfileMinMemoryCount?: number
+        existingSourceMemoryIds?: string[]
+        existingProfileUpdatedAt?: Date
+    } = {}
+) => {
+    const savedProfiles: UserProfileInput[] = []
+    const reviewedProfiles: { profileId: string; sourceMemoryIds: string[] }[] =
+        []
+    const debugMessages: string[] = []
+    const existingProfiles: UserProfileRecord[] = []
+    if (options.existingSourceMemoryIds != null) {
+        existingProfiles.push({
+            id: 'profile-1',
+            presetId: options.presetId ?? 'preset-1',
+            speakerKey: '张三',
+            speakerLabel: options.speakerLabel ?? '张三',
+            content: '旧画像',
+            sourceMemoryIds: options.existingSourceMemoryIds,
+            createdAt: now,
+            updatedAt: options.existingProfileUpdatedAt ?? now
+        })
+    }
+    const repository: UserProfileRepository & UserProfileMemoryRepository = {
+        getEntriesByPresetAndIds: async () => [memory],
+        listActiveMemorySpeakerLinks: async () => [
+            { speakerKey: '张三', memoryId: memory.id }
+        ],
+        listPresetSpeakers: async () => [
+            {
+                id: 'speaker-1',
+                presetId: 'preset-1',
+                speakerKey: '张三',
+                speakerLabel: options.speakerLabel ?? '张三',
+                speakerAliases: options.speakerAliases ?? ['张三'],
+                speakerId: 'user-1',
+                platform: 'test',
+                createdAt: now,
+                updatedAt: now
+            }
+        ],
+        upsertPresetSpeaker: async () => {},
+        listUserProfilesByPreset: async () => existingProfiles,
+        listUserProfilesBySpeakerKeys: async () => existingProfiles,
+        replaceUserProfile: async (_presetId, profile) => {
+            savedProfiles.push(profile)
+        },
+        markUserProfileReviewed: async (profileId, sourceMemoryIds) => {
+            reviewedProfiles.push({ profileId, sourceMemoryIds })
+        },
+        deleteUserProfile: async () => {}
+    }
+    let currentModel: ReturnType<typeof createToolCallingModel>['model']
+    const service = new LivingMemoryUserProfileService(
+        {
+            enableUserProfileInjection: true,
+            userProfileMinMemoryCount: options.userProfileMinMemoryCount ?? 1,
+            userProfileMemoryLimit: 20
+        },
+        repository,
+        new LivingMemoryLogger(
+            {
+                info: (message: unknown) => debugMessages.push(String(message)),
+                warn: () => {},
+                error: () => {}
+            } as never,
+            () => options.debug ?? true
+        ),
+        { resolveOrGenerateCardText: async () => '你是测试角色。' },
+        async () => currentModel
+    )
+
+    return {
+        savedProfiles,
+        reviewedProfiles,
+        debugMessages,
+        run: async (
+            responses: Parameters<typeof createToolCallingModel>[0]
+        ) => {
+            const model = createToolCallingModel(responses)
+            currentModel = model.model
+            const result = await service.regenerate(
+                options.presetId ?? 'preset-1',
+                [memory.speakerKeys[0]]
+            )
+            return { model, result }
+        }
+    }
+}
+
+it('accepts manual user profile content without a length limit', () => {
+    assert.equal(normalizeManualUserProfileContent('  手工画像  '), '手工画像')
+    assert.throws(() => normalizeManualUserProfileContent('  '), /不能为空/u)
+    assert.equal(
+        normalizeManualUserProfileContent('甲'.repeat(301)),
+        '甲'.repeat(301)
+    )
+})
+
+it('matches Dream memories through a stable user identity old nickname', async () => {
+    const harness = createHarness({
+        speakerLabel: '新昵称',
+        speakerAliases: ['张三', '新昵称']
+    })
+    const { result } = await harness.run([
+        createProfileCall('我知道该用户正在准备考试。')
+    ])
+
+    assert.equal(result.generated, 1)
+    assert.equal(harness.savedProfiles[0].speakerLabel, '新昵称')
+})
+
+it('skips profile generation below the active memory threshold', async () => {
+    const harness = createHarness({ userProfileMinMemoryCount: 2 })
+    const { model, result } = await harness.run([
+        createProfileCall('不应生成。')
+    ])
+
+    assert.equal(result.generated, 0)
+    assert.equal(model.invocations.length, 0)
+})
+
+it('skips regeneration when the profile input is unchanged', async () => {
+    const harness = createHarness({
+        existingSourceMemoryIds: [memory.id],
+        existingProfileUpdatedAt: new Date(+now + 1)
+    })
+    const { model, result } = await harness.run([
+        createProfileCall('不应生成。')
+    ])
+
+    assert.equal(result.generated, 0)
+    assert.equal(model.invocations.length, 0)
+    assert.equal(harness.savedProfiles.length, 0)
+})
+
+it('regenerates when the profile is not newer than its memories', async () => {
+    const harness = createHarness({
+        existingSourceMemoryIds: [memory.id],
+        existingProfileUpdatedAt: now
+    })
+    const { model, result } = await harness.run([createProfileCall()])
+
+    assert.equal(result.generated, 1)
+    assert.equal(model.invocations.length, 1)
+    assert.match(result.detail, /已是最新：0 人/u)
+})
+
+const profileContent = '我知道张三正在准备考试。'
+
+const createProfileCall = (content = profileContent, id = 'result-1') => {
+    return createToolCallMessage(
+        userProfileResultTool.name,
+        { action: 'update', content, reason: '记忆中有新的事实' },
+        id
+    )
+}
+
+const createKeepCall = (id = 'result-1') => {
+    return createToolCallMessage(
+        userProfileResultTool.name,
+        { action: 'keep', reason: '旧画像已涵盖这些记忆' },
+        id
+    )
+}
+
+const readPromptMessages = (
+    model: ReturnType<typeof createToolCallingModel>
+) => {
+    const messages = model.invocations[0]?.messages ?? []
+    return {
+        systemPrompt: String(
+            messages.find((message) => message.getType() === 'system')
+                ?.content ?? ''
+        ),
+        inputPrompt: String(
+            messages.find((message) => message.getType() === 'human')
+                ?.content ?? ''
+        )
+    }
+}
+
+it('passes user profile rules and memory data through tool-calling messages', async () => {
+    const harness = createHarness()
+
+    const { model } = await harness.run([createProfileCall()])
+
+    assert.equal(model.invocations.length, 1)
+    const prompt = readPromptMessages(model)
+    assert.match(prompt.systemPrompt, /<output_contract>/u)
+    assert.match(prompt.systemPrompt, /<update_rules>/u)
+    assert.match(prompt.systemPrompt, /<preset_context>/u)
+    assert.match(prompt.systemPrompt, /你是preset-1，你正在维护张三的人物画像/u)
+    assert.match(prompt.systemPrompt, /张三的关系视角，使用第三人称/u)
+    assert.doesNotMatch(prompt.systemPrompt, /张三正在准备考试/u)
+    assert.match(prompt.inputPrompt, /<user_profile_input>/u)
+    assert.doesNotMatch(prompt.inputPrompt, /<assistant_label>/u)
+    assert.doesNotMatch(prompt.inputPrompt, /<speaker_label>/u)
+    assert.doesNotMatch(prompt.inputPrompt, /<preset_context>/u)
+    assert.doesNotMatch(prompt.inputPrompt, /<existing_source_memory_ids>/u)
+    assert.match(prompt.inputPrompt, /<memory_entries>/u)
+    assert.match(prompt.inputPrompt, /张三正在准备考试/u)
+})
+
+it('keeps user profile payloads out of logs when debug is disabled', async () => {
+    const harness = createHarness({ debug: false })
+    await harness.run([createProfileCall()])
+
+    assert.ok(
+        harness.debugMessages.every(
+            (message) =>
+                !message.includes(memory.content) &&
+                !message.includes(profileContent)
+        )
+    )
+})
+
+it('uses the Character preset name as the user profile assistant label', async () => {
+    const harness = createHarness({
+        presetId: `角色甲${characterPresetSuffix}`
+    })
+
+    const { model } = await harness.run([createProfileCall()])
+
+    const prompt = readPromptMessages(model)
+    assert.match(prompt.systemPrompt, /你是角色甲，/u)
+    assert.doesNotMatch(prompt.systemPrompt, /角色甲（Character）/u)
+    assert.doesNotMatch(prompt.inputPrompt, /<assistant_label>/u)
+})
+
+it('does not rewrite or truncate generated user profile content', async () => {
+    const harness = createHarness({
+        existingSourceMemoryIds: ['memory-old']
+    })
+    const content = `张三的人物画像：${'甲'.repeat(301)}`
+    const { result } = await harness.run([createProfileCall(content)])
+
+    assert.equal(result.generated, 1)
+    assert.equal(harness.savedProfiles.length, 1)
+    assert.equal(harness.savedProfiles[0]?.content, content)
+    assert.deepEqual(harness.savedProfiles[0]?.sourceMemoryIds, ['memory-1'])
+})
+
+it('records the reviewed input when the model chooses keep', async () => {
+    const harness = createHarness({
+        existingSourceMemoryIds: ['memory-old']
+    })
+    const { result } = await harness.run([createKeepCall()])
+
+    assert.equal(result.generated, 0)
+    assert.equal(harness.savedProfiles.length, 0)
+    assert.deepEqual(harness.reviewedProfiles, [
+        { profileId: 'profile-1', sourceMemoryIds: ['memory-1'] }
+    ])
+    assert.match(result.detail, /保持原样：1 人/u)
+    assert.match(result.detail, /失败：0 人/u)
+})
+
+it('rejects keep without an existing profile and retries for an update', async () => {
+    const harness = createHarness()
+    const { model, result } = await harness.run([
+        createKeepCall(),
+        createProfileCall(profileContent, 'result-2')
+    ])
+
+    assert.equal(result.generated, 1)
+    assert.equal(model.invocations.length, 2)
+    assert.equal(harness.savedProfiles[0]?.content, profileContent)
+    assert.equal(harness.reviewedProfiles.length, 0)
+})

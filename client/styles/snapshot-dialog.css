@@ -1,0 +1,149 @@
+/* Console 宿主样式把 .el-overlay-dialog 改写为居中 flex 列布局，超高的弹窗会被压缩到
+   视口高度、再被 .lm-dialog 的 overflow: hidden 裁剪且无处可滚；改为弹窗限高、正文内滚。 */
+:global(.snapshot-dialog) {
+    display: flex;
+    flex-direction: column;
+    max-height: 84vh;
+}
+
+:global(.snapshot-dialog .el-dialog__body) {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+}
+
+/* Snapshot dialog detail contents */
+.snapshot-dialog-meta {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 16px;
+    padding: 14px;
+    border: 1px solid var(--lm-border);
+    border-radius: 4px;
+    background-color: var(--lm-bg-secondary);
+}
+
+@media (max-width: 768px) {
+    .snapshot-dialog-meta {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+.snapshot-dialog-meta > div {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.snapshot-dialog-label {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--lm-text-tertiary);
+    font-family: var(--lm-font-mono);
+}
+
+.snapshot-dialog-meta span:last-child {
+    font-family: var(--lm-font-mono);
+    font-size: 12px;
+    color: var(--lm-text-primary);
+}
+
+.snapshot-dialog-query {
+    grid-column: 1 / -1;
+    border-top: 1px solid var(--lm-border);
+    padding-top: 8px;
+    margin-top: 4px;
+}
+
+.snapshot-dialog-query span:last-child {
+    font-family: var(--lm-font-mono);
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+.snapshot-memory-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.snapshot-agentic-item {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.snapshot-final-text {
+    padding: 12px;
+    border-radius: 4px;
+    background-color: var(--lm-bg-secondary);
+    color: var(--lm-text-primary);
+    white-space: pre-wrap;
+    line-height: 1.7;
+}
+
+.snapshot-tool-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 16px;
+    color: var(--lm-text-tertiary);
+    font-size: 12px;
+    font-family: var(--lm-font-mono);
+}
+
+.snapshot-memory-item {
+    border: 1px solid var(--lm-border);
+    border-radius: 4px;
+    background-color: var(--lm-bg-primary);
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.snapshot-memory-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-bottom: 1px dashed var(--lm-border);
+    padding-bottom: 8px;
+}
+
+.snapshot-memory-score {
+    margin-left: auto;
+    font-family: var(--lm-font-mono);
+    color: var(--lm-primary);
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.snapshot-memory-content {
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--lm-text-primary);
+}
+
+.snapshot-memory-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    font-size: 11px;
+    color: var(--lm-text-tertiary);
+    font-family: var(--lm-font-mono);
+}
+
+.snapshot-memory-summary {
+    font-size: 12px;
+    background-color: var(--lm-bg-secondary);
+    border-left: 2px solid var(--lm-primary);
+    padding: 6px 10px;
+    color: var(--lm-text-secondary);
+    border-radius: 0 4px 4px 0;
+}
+
+.snapshot-memory-keywords {
+    margin-top: 2px;
+}

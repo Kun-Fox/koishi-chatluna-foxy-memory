@@ -1,0 +1,39 @@
+# Node
+node_modules/
+
+# logs
+*.log
+
+# env
+.env
+
+# build
+dist/
+build/
+lib/
+tsconfig.tsbuildinfo
+
+# system
+.DS_Store
+Thumbs.db
+
+# local planning workspace
+tmp/
+
+# agent
+.codex
+.agents
+.claude/
+.omc/
+.zcode/
+.zcodeignore
+
+# codegraph
+.codegraph/
+.yarn/
+
+# use yakumo
+yarn.lock
+
+tsconfig.temp.json
+data/

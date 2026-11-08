@@ -1,0 +1,282 @@
+import type { PGlite } from '@electric-sql/pglite'
+import type { VectorSnapshot } from '../../../contracts/vector_index'
+import type {
+    VectorIndexHybridHit,
+    VectorIndexHybridQuery,
+    VectorIndexInventoryItem,
+    VectorIndexInventoryPage,
+    VectorIndexKnnHit,
+    VectorIndexKnnQuery
+} from '../worker_protocol'
+import {
+    decodeVector,
+    normalizeIndexKeywords,
+    toPgVector
+} from './vector_values'
+
+const KEYWORD_MATCH_BOOST = 0.15
+const KEYWORD_ONLY_BASE_SCORE = 0.3
+
+interface KnnRow {
+    memoryId: string
+    cosineScore: number
+}
+
+interface KeywordRow {
+    memoryId: string
+    cosineScore: number | null
+    matchCount: string
+}
+
+const toStatusValues = (memoryStatus: VectorIndexKnnQuery['memoryStatus']) =>
+    memoryStatus === 'all' ? ['active', 'archived'] : [memoryStatus]
+
+const appendFilters = (query: VectorIndexKnnQuery, alias = '') => {
+    const prefix = alias.length > 0 ? `${alias}.` : ''
+    const conditions = [
+        `${prefix}preset_id = $1`,
+        `${prefix}status = ANY($2::text[])`
+    ]
+    const parameters: unknown[] = [
+        query.presetId,
+        toStatusValues(query.memoryStatus)
+    ]
+    if (query.excludedMemoryIds?.length) {
+        conditions.push(
+            `${prefix}memory_id <> ALL($${parameters.length + 1}::text[])`
+        )
+        parameters.push(query.excludedMemoryIds)
+    }
+    if (query.conversationId !== undefined) {
+        conditions.push(
+            `(${prefix}source_conversation_id = $${parameters.length + 1} OR ${prefix}source_conversation_id IS NULL)`
+        )
+        parameters.push(query.conversationId)
+    }
+    if (query.types !== null) {
+        conditions.push(
+            `${prefix}type = ANY($${parameters.length + 1}::text[])`
+        )
+        parameters.push(query.types)
+    }
+    return { conditions, parameters }
+}
+
+export const queryVectorIndexKnn = async (
+    database: PGlite,
+    query: VectorIndexKnnQuery
+): Promise<VectorIndexKnnHit[]> => {
+    if (query.types?.length === 0 || query.limit <= 0) {
+        return []
+    }
+    const { conditions, parameters } = appendFilters(query)
+    parameters.push(toPgVector(query.vector), query.limit)
+    const vectorParameter = parameters.length - 1
+    const limitParameter = parameters.length
+    const rows = (
+        await database.query<KnnRow>(
+            `WITH scored AS MATERIALIZED (
+                SELECT memory_id, embedding <=> $${vectorParameter}::vector AS distance
+                FROM lm_index_memory
+                WHERE ${conditions.join(' AND ')}
+             )
+             SELECT memory_id AS "memoryId", 1 - distance AS "cosineScore"
+             FROM scored
+             ORDER BY distance ASC, memory_id ASC
+             LIMIT $${limitParameter}`,
+            parameters
+        )
+    ).rows
+    return rows.map((row) => ({
+        memoryId: row.memoryId,
+        cosineScore: Number(row.cosineScore)
+    }))
+}
+
+export const queryVectorIndexHybrid = async (
+    database: PGlite,
+    query: VectorIndexHybridQuery
+): Promise<VectorIndexHybridHit[]> => {
+    if (query.types?.length === 0 || query.limit <= 0) {
+        return []
+    }
+    const semanticHits = await queryVectorIndexKnn(database, query)
+    const scores = new Map(
+        semanticHits.map((hit) => [hit.memoryId, hit.cosineScore])
+    )
+    const keywords = normalizeIndexKeywords(query.keywords)
+    if (keywords.length > 0) {
+        const { conditions, parameters } = appendFilters(query, 'm')
+        parameters.push(
+            keywords,
+            toPgVector(query.vector),
+            semanticHits.map((hit) => hit.memoryId)
+        )
+        const keywordParameter = parameters.length - 2
+        const vectorParameter = parameters.length - 1
+        const semanticIdsParameter = parameters.length
+        const keywordRows = (
+            await database.query<KeywordRow>(
+                `SELECT
+                    m.memory_id AS "memoryId",
+                    CASE
+                        WHEN m.memory_id = ANY($${semanticIdsParameter}::text[])
+                        THEN NULL
+                        ELSE 1 - (m.embedding <=> $${vectorParameter}::vector)
+                    END AS "cosineScore",
+                    COUNT(*)::text AS "matchCount"
+                 FROM lm_index_keywords AS k
+                 JOIN lm_index_memory AS m ON m.memory_id = k.memory_id
+                 WHERE ${conditions.join(' AND ')}
+                   AND k.keyword = ANY($${keywordParameter}::text[])
+                 GROUP BY m.memory_id, m.embedding`,
+                parameters
+            )
+        ).rows
+        for (const row of keywordRows) {
+            if (scores.has(row.memoryId)) {
+                continue
+            }
+            if (row.cosineScore === null) {
+                throw new Error(
+                    `keyword-only vector score is missing: memoryId=${row.memoryId}`
+                )
+            }
+            scores.set(row.memoryId, Number(row.cosineScore))
+        }
+
+        const counts = new Map(
+            keywordRows.map((row) => [row.memoryId, Number(row.matchCount)])
+        )
+        return [...scores]
+            .map(([memoryId, cosineScore]) => {
+                const keywordMatchCount = counts.get(memoryId) ?? 0
+                if (cosineScore >= query.minSimilarity) {
+                    return {
+                        memoryId,
+                        cosineScore,
+                        keywordMatchCount,
+                        boostedScore:
+                            cosineScore +
+                            KEYWORD_MATCH_BOOST * keywordMatchCount
+                    }
+                }
+                if (keywordMatchCount > 0) {
+                    return {
+                        memoryId,
+                        cosineScore: 0,
+                        keywordMatchCount,
+                        boostedScore:
+                            KEYWORD_ONLY_BASE_SCORE * keywordMatchCount
+                    }
+                }
+                return null
+            })
+            .filter((hit): hit is VectorIndexHybridHit => hit !== null)
+            .sort(
+                (left, right) =>
+                    right.boostedScore - left.boostedScore ||
+                    left.memoryId.localeCompare(right.memoryId)
+            )
+            .slice(0, query.limit)
+    }
+
+    return semanticHits
+        .filter(
+            (hit) =>
+                query.minSimilarity === 0 ||
+                hit.cosineScore >= query.minSimilarity
+        )
+        .map((hit) => ({
+            ...hit,
+            keywordMatchCount: 0,
+            boostedScore: hit.cosineScore
+        }))
+}
+
+export const readVectorSnapshot = async (
+    database: PGlite,
+    presetId: string,
+    memoryIds: string[]
+): Promise<VectorSnapshot> => {
+    return database.transaction(async (transaction) => {
+        const manifest = (
+            await transaction.query<
+                Pick<
+                    VectorSnapshot,
+                    'embeddingModelId' | 'dimension' | 'generation'
+                >
+            >(`SELECT embedding_model_id AS "embeddingModelId", dimension, generation
+               FROM lm_index_manifest WHERE singleton = 1`)
+        ).rows[0]
+        const rows = (
+            await transaction.query<{
+                memoryId: string
+                contentHash: string
+                status: VectorSnapshot['items'][number]['status']
+                embedding: string
+            }>(
+                `SELECT memory_id AS "memoryId", content_hash AS "contentHash",
+                        status, embedding::text AS embedding
+                 FROM lm_index_memory
+                 WHERE preset_id = $1 AND memory_id = ANY($2::text[])`,
+                [presetId, memoryIds]
+            )
+        ).rows
+        const found = new Set(rows.map((row) => row.memoryId))
+        return {
+            ...manifest,
+            items: rows.map(({ embedding, ...row }) => ({
+                ...row,
+                vector: decodeVector(embedding)
+            })),
+            missingMemoryIds: memoryIds.filter((id) => !found.has(id))
+        }
+    })
+}
+
+export const readVectorIndexInventoryPage = async (
+    database: PGlite,
+    presetId: string | null,
+    afterMemoryId: string | null,
+    limit: number
+): Promise<VectorIndexInventoryPage> => {
+    const conditions: string[] = []
+    const parameters: unknown[] = []
+    if (presetId !== null) {
+        conditions.push(`preset_id = $${parameters.length + 1}`)
+        parameters.push(presetId)
+    }
+    if (afterMemoryId !== null) {
+        conditions.push(`memory_id > $${parameters.length + 1}`)
+        parameters.push(afterMemoryId)
+    }
+    parameters.push(limit + 1)
+    const rows = (
+        await database.query<VectorIndexInventoryItem>(
+            `SELECT
+                memory_id AS "memoryId",
+                preset_id AS "presetId",
+                source_conversation_id AS "sourceConversationId",
+                status,
+                type,
+                content_hash AS "contentHash",
+                keywords_hash AS "keywordsHash",
+                updated_at AS "updatedAt"
+             FROM lm_index_memory
+             ${conditions.length === 0 ? '' : `WHERE ${conditions.join(' AND ')}`}
+             ORDER BY memory_id ASC
+             LIMIT $${parameters.length}`,
+            parameters
+        )
+    ).rows
+    const items = rows.slice(0, limit).map((row) => ({
+        ...row,
+        updatedAt: Number(row.updatedAt)
+    }))
+    return {
+        items,
+        nextCursor:
+            rows.length > limit ? items[items.length - 1].memoryId : null
+    }
+}

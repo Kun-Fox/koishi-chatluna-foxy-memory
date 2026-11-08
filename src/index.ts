@@ -1,0 +1,208 @@
+import { Context, Schema } from 'koishi'
+import {} from 'koishi-plugin-chatluna/services/chat'
+import type {} from '@koishijs/plugin-console'
+import { apply as characterMiddlewarePlugin } from './plugins/character_middleware'
+import { apply as chatMiddlewarePlugin } from './plugins/chat_middleware'
+import { apply as livingMemoryToolsPlugin } from './plugins/living_memory_tools'
+import { apply as livingMemoryCommandsPlugin } from './plugins/commands'
+import {
+    registerEntry as registerWebUIEntry,
+    apply as webuiPlugin
+} from './plugins/webui'
+import { ChatLunaLivingMemoryService } from './service/app/living_memory_service'
+import type { LivingMemoryConfig } from './contracts/workflows'
+
+export type Config = LivingMemoryConfig
+
+export function apply(ctx: Context, config: Config) {
+    ctx.plugin(ChatLunaLivingMemoryService, config)
+
+    ctx.inject(['console'], (ctx) => {
+        registerWebUIEntry(ctx)
+
+        ctx.inject(['chatluna_living_memory'], (ctx) => {
+            webuiPlugin(ctx, config)
+        })
+    })
+
+    ctx.inject(['chatluna_living_memory'], (ctx) => {
+        livingMemoryCommandsPlugin(ctx)
+        void chatMiddlewarePlugin(ctx, config)
+        livingMemoryToolsPlugin(ctx, config)
+
+        ctx.inject(['chatluna_character'], (ctx) => {
+            void characterMiddlewarePlugin(ctx, config)
+        })
+    })
+}
+
+export const name = 'chatluna-foxy-memory'
+export const reusable = false
+
+export const inject = {
+    required: ['chatluna', 'database'],
+    optional: ['console', 'chatluna_character']
+}
+
+export const Config: Schema<Config> = Schema.intersect([
+    Schema.object({
+        enableSnapshotInjection: Schema.boolean()
+            .description('开启 ChatLuna 主插件的记忆快照注入。')
+            .default(true),
+        debug: Schema.boolean()
+            .description(
+                '记录 Recall、Extraction、Dream 每次模型调用的完整 Prompt、原始响应与诊断事件。'
+            )
+            .default(false)
+    }).description('基础配置'),
+    Schema.object({
+        mainModel: Schema.dynamic('model')
+            .description('主 LLM 模型，用于提取记忆、Dream 与用户画像。')
+            .default('无'),
+        subModel: Schema.dynamic('model')
+            .description('子 LLM 模型，用于召回记忆。')
+            .default('无'),
+        embeddingModel: Schema.dynamic('embeddings')
+            .description('嵌入模型，用于记忆检索与 Dream。')
+            .default('无'),
+        rerankModel: Schema.dynamic('reranker')
+            .description('Reranker 模型，用于记忆检索结果重排序。')
+            .default('无')
+    }).description('模型配置'),
+    Schema.object({
+        memorySearchToolMaxResults: Schema.number()
+            .min(1)
+            .max(60)
+            .step(1)
+            .description(
+                '每次记忆检索最多返回的记忆条数，召回与 living_memory_search 共用。'
+            )
+            .default(30),
+        memorySearchMinSimilarity: Schema.number()
+            .min(0)
+            .max(1)
+            .step(0.05)
+            .description(
+                '记忆检索的最低余弦相似度，召回与 living_memory_search 共用。关键词命中的记忆不受限制；设为 0 表示不限制。'
+            )
+            .default(0),
+        enabledMemoryTools: Schema.array(
+            Schema.union([
+                Schema.const<string>('living_memory_search').description(
+                    '记忆查询工具：通过语义检索查询记忆'
+                ),
+                Schema.const<string>('living_memory_get_messages').description(
+                    '来源查看工具：查看记忆来源的聊天消息'
+                ),
+                Schema.const<string>('living_memory_create_memory').description(
+                    '记忆创建工具：创建新的记忆'
+                ),
+                Schema.const<string>('living_memory_update_memory').description(
+                    '记忆更新工具：更新已有记忆'
+                ),
+                Schema.const<string>(
+                    'living_memory_merge_memories'
+                ).description('记忆合并工具：将多条记忆合并为一条'),
+                Schema.const<string>('living_memory_split_memory').description(
+                    '记忆拆分工具：将一条记忆拆分为多条'
+                ),
+                Schema.const<string>('living_memory_delete_memory').description(
+                    '记忆删除工具：归档删除记忆'
+                )
+            ])
+        )
+            .role('checkbox')
+            .description('选择向 ChatLuna 注册的记忆工具。')
+            .default([
+                'living_memory_search',
+                'living_memory_get_messages',
+                'living_memory_create_memory'
+            ]),
+        memoryCreateToolMaxMemories: Schema.number()
+            .min(1)
+            .max(60)
+            .step(1)
+            .description(
+                'living_memory_create_memory 单次调用最多创建的记忆条数。'
+            )
+            .default(10)
+    }).description('工具配置'),
+    Schema.object({
+        enableUserProfileInjection: Schema.boolean()
+            .description('开启用户画像注入。')
+            .default(false),
+        enableUserProfileGeneration: Schema.boolean()
+            .description('进行记忆提取后，生成、更新相关用户画像。')
+            .default(true),
+        enableDreamUserProfileGeneration: Schema.boolean()
+            .description('进行 Dream 记忆整理后，生成、更新相关用户画像。')
+            .default(true),
+        userProfileMinMemoryCount: Schema.number()
+            .min(1)
+            .max(30)
+            .step(1)
+            .description('生成或更新单个用户画像所需的最少关联活跃记忆条数。')
+            .default(3),
+        userProfileMemoryLimit: Schema.number()
+            .min(5)
+            .max(100)
+            .step(1)
+            .description('生成单个用户画像时可送入 LLM 的相关记忆条数上限。')
+            .default(20)
+    }).description('用户画像配置'),
+    Schema.object({
+        enableConversationIsolation: Schema.boolean()
+            .description(
+                '自动召回与 living_memory_search 只检索当前会话产生的记忆与全局记忆。'
+            )
+            .default(false),
+        recallIntervalMessages: Schema.number()
+            .min(0)
+            .max(200)
+            .step(1)
+            .description(
+                '每累计该条数的新消息（含 bot 未回复的闲聊）自动召回一次记忆，会话首次对话时立即召回。设为 0 时关闭自动召回。'
+            )
+            .default(10),
+        recallHistoryMessages: Schema.number()
+            .min(1)
+            .max(200)
+            .step(1)
+            .description('每次召回取最近该条数的消息作为上下文。')
+            .default(20),
+        snapshotMaxLines: Schema.number()
+            .min(5)
+            .max(50)
+            .step(1)
+            .description('记忆快照的最大行数，每行最多 100 个字符。')
+            .default(5)
+    }).description('记忆召回配置'),
+    Schema.object({
+        extractionWindowMessages: Schema.number()
+            .min(0)
+            .max(200)
+            .step(1)
+            .description(
+                '未提取的消息累计达到该条数时自动提取一次记忆。设为 0 时关闭自动提取。'
+            )
+            .default(30),
+        enableAutoDream: Schema.boolean()
+            .description('自动提取保存新记忆后，检索近邻并通过 Dream 整理。')
+            .default(true),
+        extractionIncludeOverheard: Schema.boolean()
+            .description(
+                'Character 开启时，从首条普通消息开始累计，达到阈值即提取；关闭时，在 bot 回复后围绕完整交流提取。'
+            )
+            .default(false),
+        enableExtractionWhitelist: Schema.boolean()
+            .description('只对白名单内的会话自动提取记忆。')
+            .default(false),
+        extractionWhitelist: Schema.array(Schema.string())
+            .role('table')
+            .description('自动提取白名单：群聊填群号，私聊填对方 QQ 号。')
+            .default([])
+    }).description('记忆提取配置')
+])
+
+export * from './types'
+export * from './service/app/living_memory_service'

@@ -1,0 +1,231 @@
+import { send } from '@koishijs/client'
+import type {
+    DreamTriggerResult,
+    MemoryServiceStatus
+} from '../src/contracts/workflows'
+import type {
+    LivingMemoryConsoleEvents,
+    JobListQuery,
+    MemoryListQuery,
+    SnapshotListQuery,
+    UserProfileListQuery,
+    MemoryListFilter,
+    MemoryListResult,
+    PageResult
+} from '../src/contracts/rpc'
+import type {
+    LivingMemoryPresetExport,
+    LivingMemoryPresetImportResult,
+    LivingMemorySearchDetailedResult,
+    LivingMemorySearchInput,
+    MemoryEntryRecord,
+    MemoryJobRecord,
+    MemoryMutationInput,
+    MemoryUpdatePatch,
+    MemorySnapshotRecord,
+    PresetPersonaCardInfo,
+    PresetSpeakerRecord,
+    UserProfileRecord
+} from '../src/contracts/memory'
+
+const sendLivingMemory = send as unknown as <
+    Name extends keyof LivingMemoryConsoleEvents
+>(
+    name: Name,
+    ...args: Parameters<LivingMemoryConsoleEvents[Name]>
+) => Promise<Awaited<ReturnType<LivingMemoryConsoleEvents[Name]>>>
+
+export async function listPresetIds(): Promise<string[]> {
+    return await sendLivingMemory('living-memory/listPresetIds')
+}
+
+export async function getStatus(): Promise<MemoryServiceStatus> {
+    return await sendLivingMemory('living-memory/getStatus')
+}
+
+export async function listMemories(
+    params: MemoryListQuery
+): Promise<MemoryListResult> {
+    return await sendLivingMemory('living-memory/listMemories', params)
+}
+
+export async function listMemoryIds(
+    filter: MemoryListFilter
+): Promise<string[]> {
+    return await sendLivingMemory('living-memory/listMemoryIds', filter)
+}
+
+export async function getMemory(
+    memoryId: string
+): Promise<MemoryEntryRecord | undefined> {
+    return await sendLivingMemory('living-memory/getMemory', memoryId)
+}
+
+export async function createMemory(
+    presetId: string,
+    memory: MemoryMutationInput,
+    speakerKeys: string[]
+): Promise<MemoryEntryRecord> {
+    return await sendLivingMemory('living-memory/createMemory', {
+        presetId,
+        memory,
+        speakerKeys
+    })
+}
+
+export async function updateMemory(
+    memoryId: string,
+    patch: MemoryUpdatePatch
+): Promise<{ success: true }> {
+    return await sendLivingMemory('living-memory/updateMemory', memoryId, patch)
+}
+
+export async function deleteMemory(
+    memoryId: string
+): Promise<{ success: true }> {
+    return await sendLivingMemory('living-memory/deleteMemory', memoryId)
+}
+
+export async function deleteMemories(
+    presetId: string,
+    ids: string[]
+): Promise<{ success: true; deleted: number }> {
+    return await sendLivingMemory('living-memory/deleteMemories', presetId, ids)
+}
+
+export async function listSnapshots(
+    params: SnapshotListQuery
+): Promise<PageResult<MemorySnapshotRecord>> {
+    return await sendLivingMemory('living-memory/listSnapshots', params)
+}
+
+export async function deleteSnapshot(
+    snapshotId: string
+): Promise<{ success: true }> {
+    return await sendLivingMemory('living-memory/deleteSnapshot', snapshotId)
+}
+
+export async function listJobs(
+    params: JobListQuery
+): Promise<PageResult<MemoryJobRecord>> {
+    return await sendLivingMemory('living-memory/listJobs', params)
+}
+
+export async function listUserProfiles(
+    params: UserProfileListQuery
+): Promise<PageResult<UserProfileRecord>> {
+    return await sendLivingMemory('living-memory/listUserProfiles', params)
+}
+
+export async function listPresetSpeakers(
+    presetId: string
+): Promise<PresetSpeakerRecord[]> {
+    return await sendLivingMemory('living-memory/listPresetSpeakers', presetId)
+}
+
+export async function listPresetPersonas(): Promise<PresetPersonaCardInfo[]> {
+    return await sendLivingMemory('living-memory/listPresetPersonas')
+}
+
+export async function savePresetPersonaCard(
+    presetId: string,
+    card: string
+): Promise<{ success: true }> {
+    return await sendLivingMemory(
+        'living-memory/savePresetPersonaCard',
+        presetId,
+        card
+    )
+}
+
+export async function resetPresetPersonaCard(
+    presetId: string
+): Promise<{ success: true }> {
+    return await sendLivingMemory(
+        'living-memory/resetPresetPersonaCard',
+        presetId
+    )
+}
+
+export async function deleteUserProfile(
+    profileId: string
+): Promise<{ success: true }> {
+    return await sendLivingMemory('living-memory/deleteUserProfile', profileId)
+}
+
+export async function updateUserProfile(
+    profileId: string,
+    content: string
+): Promise<{ success: true }> {
+    return await sendLivingMemory(
+        'living-memory/updateUserProfile',
+        profileId,
+        content
+    )
+}
+
+export async function regenerateUserProfile(
+    presetId: string,
+    speakerKey: string
+): Promise<{ generated: number; detail: string }> {
+    return await sendLivingMemory(
+        'living-memory/regenerateUserProfile',
+        presetId,
+        speakerKey
+    )
+}
+
+export async function runDream(presetId: string): Promise<DreamTriggerResult> {
+    return await sendLivingMemory('living-memory/runDream', presetId)
+}
+
+export async function reconcileVectorIndex(
+    presetId: string
+): Promise<MemoryJobRecord> {
+    return await sendLivingMemory(
+        'living-memory/reconcileVectorIndex',
+        presetId
+    )
+}
+
+export async function rebuildVectorIndex(): Promise<{ success: true }> {
+    return await sendLivingMemory('living-memory/rebuildVectorIndex')
+}
+
+export async function restartVectorIndex(): Promise<{ success: true }> {
+    return await sendLivingMemory('living-memory/restartVectorIndex')
+}
+
+export async function clearPresetData(
+    presetId: string
+): Promise<{ success: true }> {
+    return await sendLivingMemory('living-memory/clearPresetData', presetId)
+}
+
+export async function exportPreset(
+    presetId: string
+): Promise<LivingMemoryPresetExport> {
+    return await sendLivingMemory('living-memory/exportPreset', presetId)
+}
+
+export async function importPreset(
+    targetPresetId: string,
+    data: LivingMemoryPresetExport
+): Promise<LivingMemoryPresetImportResult> {
+    return await sendLivingMemory(
+        'living-memory/importPreset',
+        targetPresetId,
+        data
+    )
+}
+
+export async function searchMemoriesDetailed(
+    presetId: string,
+    input: LivingMemorySearchInput
+): Promise<LivingMemorySearchDetailedResult[]> {
+    return await sendLivingMemory(
+        'living-memory/searchMemoriesDetailed',
+        presetId,
+        input
+    )
+}

@@ -1,0 +1,355 @@
+import { HumanMessage } from '@langchain/core/messages'
+import { OutputParserException } from '@langchain/core/output_parsers'
+import {
+    ChatPromptTemplate,
+    MessagesPlaceholder
+} from '@langchain/core/prompts'
+import { tool } from '@langchain/core/tools'
+import type { ChainValues } from '@langchain/core/utils/types'
+import type { z } from 'zod'
+import {
+    type AgentAction,
+    type AgentFinish,
+    createOpenAIAgent,
+    type ScratchpadEntry
+} from 'koishi-plugin-chatluna/llm-core/agent'
+import type { ChatLunaChatModel } from 'koishi-plugin-chatluna/llm-core/platform/model'
+import type { PromptMessages } from '../prompts/prompt_format'
+import { formatErrorDetails } from '../shared/utils'
+import { formatLogScope, type LivingMemoryLogger } from '../logging/logger'
+import { createLoggedModel, modelStageLabels } from '../logging/model_calls'
+
+const structuredOutputMaxModelCalls = 3
+const outputParsingFailureCode = 'OUTPUT_PARSING_FAILURE'
+
+const structuredOutputPromptTemplate = ChatPromptTemplate.fromMessages([
+    ['system', '{systemPrompt}'],
+    ['human', '{inputPrompt}'],
+    new MessagesPlaceholder('agent_scratchpad')
+])
+
+type StructuredOutputDecision = AgentAction | AgentAction[] | AgentFinish
+type StructuredOutputAgentInput = ChainValues & {
+    steps: []
+    scratchpadEntries: ScratchpadEntry[]
+}
+
+export interface StructuredOutputContext {
+    presetId: string
+    conversationId: string
+}
+
+export type StructuredOutputResult<T> =
+    | { value: T; output: string; parseError: null }
+    | { value: null; output: string; parseError: string }
+
+interface StructuredOutputOptions<Schema extends z.AnyZodObject> {
+    model: ChatLunaChatModel
+    signal?: AbortSignal
+    prompt: PromptMessages
+    toolName: string
+    toolDescription: string
+    schema: Schema
+    validateResult?: (value: z.output<Schema>) => string | undefined
+    stringifiedArrayField?: Extract<keyof z.input<Schema>, string>
+    context: StructuredOutputContext
+    logging?: {
+        logger: LivingMemoryLogger
+        stage: string
+    }
+}
+
+type StructuredOutputValidation<T> =
+    | { value: T; error: null; normalizedField: string | null }
+    | { value: null; error: string; normalizedField: string | null }
+
+const toActions = (decision: StructuredOutputDecision): AgentAction[] => {
+    if (Array.isArray(decision)) {
+        return decision
+    }
+
+    return 'returnValues' in decision ? [] : [decision]
+}
+
+const formatDecision = (decision: StructuredOutputDecision) => {
+    if (!Array.isArray(decision) && 'returnValues' in decision) {
+        const output = decision.returnValues['output']
+        if (typeof output === 'string') return output
+        return JSON.stringify(output, null, 2) ?? String(output ?? '')
+    }
+
+    return JSON.stringify(
+        toActions(decision).map((action) => ({
+            tool: action.tool,
+            arguments: action.toolInput
+        })),
+        null,
+        2
+    )
+}
+
+const formatSchemaError = (error: z.ZodError) => {
+    return error.issues
+        .map((issue) => {
+            const path = issue.path.length > 0 ? issue.path.join('.') : 'root'
+            return `${path}: ${issue.message}`
+        })
+        .join('; ')
+}
+
+const parseToolInput = (input: AgentAction['toolInput']) => {
+    if (typeof input !== 'string') {
+        return input
+    }
+
+    try {
+        return JSON.parse(input) as unknown
+    } catch {
+        return input
+    }
+}
+
+const normalizeStringifiedArrayField = (input: unknown, field: string) => {
+    const unchanged = { value: input, normalizedField: null }
+    if (input == null || typeof input !== 'object' || Array.isArray(input)) {
+        return unchanged
+    }
+
+    const record = input as Record<string, unknown>
+    const raw = record[field]
+    if (typeof raw !== 'string') {
+        return unchanged
+    }
+
+    try {
+        const parsed = JSON.parse(raw) as unknown
+        if (!Array.isArray(parsed)) {
+            return unchanged
+        }
+
+        return {
+            value: { ...record, [field]: parsed },
+            normalizedField: field
+        }
+    } catch {
+        // 保留原值，让严格 Schema 生成明确错误并进入现有纠正重试。
+        return unchanged
+    }
+}
+
+const validateDecision = <Schema extends z.AnyZodObject>(
+    decision: StructuredOutputDecision,
+    toolName: string,
+    schema: Schema,
+    stringifiedArrayField?: string
+): StructuredOutputValidation<z.output<Schema>> => {
+    const actions = toActions(decision)
+    if (actions.length === 0) {
+        return {
+            value: null,
+            error: `model finished without calling ${toolName}`,
+            normalizedField: null
+        }
+    }
+
+    if (actions.length !== 1) {
+        return {
+            value: null,
+            error: `${toolName} must be called exactly once; received ${actions.length} tool calls`,
+            normalizedField: null
+        }
+    }
+
+    const action = actions[0]
+    if (action.tool !== toolName) {
+        return {
+            value: null,
+            error: `unexpected tool call ${action.tool}; expected ${toolName}`,
+            normalizedField: null
+        }
+    }
+
+    const toolInput = parseToolInput(action.toolInput)
+    const normalized =
+        stringifiedArrayField == null
+            ? { value: toolInput, normalizedField: null }
+            : normalizeStringifiedArrayField(toolInput, stringifiedArrayField)
+    const parsed = schema.safeParse(normalized.value)
+    if (!parsed.success) {
+        return {
+            value: null,
+            error: `invalid ${toolName} arguments: ${formatSchemaError(parsed.error)}`,
+            normalizedField: normalized.normalizedField
+        }
+    }
+
+    return {
+        value: parsed.data,
+        error: null,
+        normalizedField: normalized.normalizedField
+    }
+}
+
+const createRetryEntries = (
+    decision: StructuredOutputDecision | null,
+    toolName: string,
+    error: string,
+    stringifiedArrayField?: string
+): ScratchpadEntry[] => {
+    const instructions = [
+        `结构化结果无效：${error}。`,
+        `必须且只能调用 ${toolName} 一次，并完整修正工具参数。`
+    ]
+    if (stringifiedArrayField != null) {
+        instructions.push(
+            `${stringifiedArrayField} 必须直接传 JSON 数组：正确 {"${stringifiedArrayField}":[]}；错误 {"${stringifiedArrayField}":"[]"}。`
+        )
+    }
+    instructions.push('不要在普通文本中输出结果。')
+    const correction = instructions.join(' ')
+    const actions = decision == null ? [] : toActions(decision)
+
+    if (actions.length > 0) {
+        return actions.map((action) => ({
+            action,
+            observation: correction
+        }))
+    }
+
+    return [
+        {
+            type: 'human_update',
+            messages: [new HumanMessage(correction)]
+        }
+    ]
+}
+
+export const isOutputParserException = (
+    error: unknown
+): error is OutputParserException => {
+    return (
+        error instanceof OutputParserException ||
+        (error instanceof Error &&
+            'lc_error_code' in error &&
+            error.lc_error_code === outputParsingFailureCode)
+    )
+}
+
+export async function invokeStructuredOutput<Schema extends z.AnyZodObject>(
+    options: StructuredOutputOptions<Schema>
+): Promise<StructuredOutputResult<z.output<Schema>>> {
+    const resultTool = tool(async (input) => JSON.stringify(input), {
+        name: options.toolName,
+        description: options.toolDescription,
+        schema: options.schema
+    })
+    let activeAttempt = 0
+    const agent = createOpenAIAgent({
+        llm: options.logging
+            ? createLoggedModel(options.model, {
+                  logger: options.logging.logger,
+                  stage: options.logging.stage,
+                  attempt: () => activeAttempt
+              })
+            : options.model,
+        tools: [resultTool],
+        prompt: structuredOutputPromptTemplate
+    })
+    const outputs: string[] = []
+    let scratchpadEntries: ScratchpadEntry[] = []
+    let lastError = 'structured output failed'
+    const logParseFailure = (attempt: number, error: string) => {
+        const logging = options.logging
+        logging?.logger.diagnosticSummary((fields) => ({
+            event: `${modelStageLabels[logging.stage] ?? logging.stage}结果解析失败`,
+            detail: [
+                formatLogScope(fields),
+                ...(fields.speaker == null ? [] : [`人物：${fields.speaker}`]),
+                `调用序号：${attempt}`,
+                `原因：${error}`
+            ]
+                .filter(Boolean)
+                .join('; ')
+        }))
+    }
+
+    for (let attempt = 1; attempt <= structuredOutputMaxModelCalls; attempt++) {
+        options.signal?.throwIfAborted()
+        activeAttempt = attempt
+        let decision: StructuredOutputDecision | null = null
+
+        try {
+            decision = await agent.invoke(
+                {
+                    systemPrompt: options.prompt.systemPrompt,
+                    inputPrompt: options.prompt.inputPrompt,
+                    steps: [],
+                    scratchpadEntries
+                } as StructuredOutputAgentInput,
+                {
+                    signal: options.signal,
+                    configurable: {
+                        model: options.model,
+                        preset: options.context.presetId,
+                        conversationId: options.context.conversationId
+                    }
+                }
+            )
+        } catch (error) {
+            options.signal?.throwIfAborted()
+            if (!isOutputParserException(error)) throw error
+            lastError = formatErrorDetails(error)
+            outputs.push(
+                `[attempt ${attempt}]\n${error.llmOutput ?? lastError}`
+            )
+            logParseFailure(attempt, lastError)
+            scratchpadEntries = createRetryEntries(
+                null,
+                options.toolName,
+                lastError,
+                options.stringifiedArrayField
+            )
+            continue
+        }
+        options.signal?.throwIfAborted()
+        outputs.push(`[attempt ${attempt}]\n${formatDecision(decision)}`)
+        const validated = validateDecision(
+            decision,
+            options.toolName,
+            options.schema,
+            options.stringifiedArrayField
+        )
+        if (validated.normalizedField != null) {
+            outputs.push(
+                `[attempt ${attempt} normalization]\ndecoded stringified JSON array field: ${validated.normalizedField}`
+            )
+        }
+        if (validated.error !== null) {
+            lastError = validated.error
+        } else {
+            const validationError = options.validateResult?.(validated.value)
+            if (validationError === undefined) {
+                return {
+                    value: validated.value,
+                    output: outputs.join('\n\n'),
+                    parseError: null
+                }
+            }
+            lastError = validationError
+        }
+        logParseFailure(attempt, lastError)
+
+        scratchpadEntries = createRetryEntries(
+            decision,
+            options.toolName,
+            lastError,
+            options.stringifiedArrayField
+        )
+    }
+
+    return {
+        value: null,
+        output: outputs.join('\n\n'),
+        parseError: lastError
+    }
+}

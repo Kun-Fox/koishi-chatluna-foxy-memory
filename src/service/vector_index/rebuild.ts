@@ -1,0 +1,188 @@
+import { performance } from 'node:perf_hooks'
+import type {
+    LegacyMemoryEmbeddingRecord,
+    MemoryIndexSourceRecord,
+    MemoryVectorIndexManifest
+} from '../../contracts/vector_index'
+import { formatErrorDetails } from '../shared/utils'
+import { createVectorIndexDocument } from './documents'
+import { type EmbeddingsLike, embedMemoryIndexSources } from './embedding'
+import { LivingMemoryVectorIndexError } from './errors'
+import type { LivingMemoryVectorIndexWorkerClient } from './worker_client'
+import type {
+    VectorIndexInspection,
+    VectorIndexReplaceUpsert
+} from './worker_protocol'
+
+const REBUILD_PAGE_SIZE = 50
+
+export interface VectorIndexRebuildRepository {
+    listEntryIndexSourcePage(
+        afterId: string | null,
+        limit: number
+    ): Promise<MemoryIndexSourceRecord[]>
+    listLegacyEmbeddingPage(
+        afterId: string | null,
+        limit: number
+    ): Promise<LegacyMemoryEmbeddingRecord[]>
+    listEntryPresetIds(): Promise<string[]>
+    countEntriesByPreset(presetId: string): Promise<number>
+}
+
+export type VectorIndexRebuildWorker = Pick<
+    LivingMemoryVectorIndexWorkerClient,
+    'abortRebuild' | 'appendRebuildBatch' | 'openRebuildDatabase'
+>
+
+export interface VectorIndexRebuildProgress {
+    completed: number
+    total: number
+    batchDuration: number
+    totalDuration: number
+}
+
+const groupUpsertsByPreset = (upserts: VectorIndexReplaceUpsert[]) => {
+    const grouped = new Map<string, VectorIndexReplaceUpsert[]>()
+    for (const upsert of upserts) {
+        const presetId = upsert.document.presetId
+        let group = grouped.get(presetId)
+        if (group === undefined) {
+            group = []
+            grouped.set(presetId, group)
+        }
+        group.push(upsert)
+    }
+    return grouped
+}
+
+export const rebuildVectorIndex = async (options: {
+    repository: VectorIndexRebuildRepository
+    worker: VectorIndexRebuildWorker
+    embeddings: EmbeddingsLike
+    embeddingModelId: string
+    dimension: number
+    reuseLegacyEmbeddings: boolean
+    manifest: MemoryVectorIndexManifest
+    rebuildDatabaseDirectory: string
+    finalize: (
+        transferCleanupOwnership: () => void
+    ) => Promise<VectorIndexInspection>
+    onProgress: (progress: VectorIndexRebuildProgress) => Promise<void>
+    shouldStop: () => boolean
+}) => {
+    const {
+        repository,
+        worker,
+        embeddings,
+        embeddingModelId,
+        dimension,
+        reuseLegacyEmbeddings,
+        manifest,
+        rebuildDatabaseDirectory,
+        finalize,
+        onProgress,
+        shouldStop
+    } = options
+    let rebuildCreated = false
+    let cleanupOwnedByFinalize = false
+    try {
+        const created = await worker.openRebuildDatabase(
+            rebuildDatabaseDirectory,
+            manifest
+        )
+        rebuildCreated = true
+        if (
+            created.vectorExtensionVersion !== manifest.vectorExtensionVersion
+        ) {
+            throw new Error(
+                `pgvector version mismatch: ` +
+                    `expected=${manifest.vectorExtensionVersion}, ` +
+                    `actual=${created.vectorExtensionVersion}`
+            )
+        }
+        const presetIds = await repository.listEntryPresetIds()
+        let total = 0
+        for (const presetId of presetIds) {
+            total += await repository.countEntriesByPreset(presetId)
+        }
+
+        const startedAt = performance.now()
+        let completed = 0
+        let cursor: string | null = null
+        while (true) {
+            if (shouldStop()) {
+                throw new Error('vector index service is stopping')
+            }
+            const batchStartedAt = performance.now()
+            const sources = await repository.listEntryIndexSourcePage(
+                cursor,
+                REBUILD_PAGE_SIZE
+            )
+            if (sources.length === 0) {
+                break
+            }
+
+            let legacy: LegacyMemoryEmbeddingRecord[] = []
+            if (reuseLegacyEmbeddings) {
+                legacy = await repository.listLegacyEmbeddingPage(
+                    cursor,
+                    REBUILD_PAGE_SIZE
+                )
+            }
+            const legacyById = new Map(
+                legacy.map((record) => [record.id, record])
+            )
+            const replacements = await embedMemoryIndexSources(
+                embeddings,
+                embeddingModelId,
+                dimension,
+                sources,
+                legacyById
+            )
+            const upserts: VectorIndexReplaceUpsert[] = replacements.map(
+                (replacement) => ({
+                    vectorAction: 'replace',
+                    document: createVectorIndexDocument(replacement.source),
+                    vector: replacement.vector
+                })
+            )
+
+            for (const [presetId, group] of groupUpsertsByPreset(upserts)) {
+                await worker.appendRebuildBatch(presetId, group)
+            }
+
+            completed += sources.length
+            const finishedAt = performance.now()
+            await onProgress({
+                completed,
+                total,
+                batchDuration: finishedAt - batchStartedAt,
+                totalDuration: finishedAt - startedAt
+            })
+            cursor = sources[sources.length - 1].id
+        }
+
+        return await finalize(() => {
+            cleanupOwnedByFinalize = true
+        })
+    } catch (error) {
+        let cleanupError: unknown = null
+        if (rebuildCreated && !cleanupOwnedByFinalize) {
+            try {
+                await worker.abortRebuild()
+            } catch (abortError) {
+                cleanupError = abortError
+            }
+        }
+        let message = formatErrorDetails(error)
+        if (cleanupError !== null) {
+            message += `; rebuild cleanup failed: ${formatErrorDetails(cleanupError)}`
+        }
+        throw new LivingMemoryVectorIndexError(
+            'rebuild-failed',
+            'unavailable',
+            `vector index rebuild failed: ${message}`,
+            { cause: error }
+        )
+    }
+}

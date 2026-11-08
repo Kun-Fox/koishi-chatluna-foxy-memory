@@ -1,0 +1,176 @@
+import type { ToolRunnableConfig } from '@langchain/core/tools'
+import type { MemoryScope } from '../../../contracts/memory'
+import {
+    isSubagentRunContext,
+    toAgentRunContextFields,
+    toCharacterMemoryConversationId,
+    toCharacterMemoryPresetId
+} from '../helpers'
+import { toNonEmptyString } from '../../shared/utils'
+
+export type LivingMemoryToolConfigurable = {
+    preset?: unknown
+    agentContext?: unknown
+    session?: unknown
+}
+
+export const getLivingMemoryToolConfigurable = (
+    runConfig?: ToolRunnableConfig<Record<string, unknown>>
+): LivingMemoryToolConfigurable | undefined => runConfig?.configurable
+
+interface LivingMemoryToolSessionFields {
+    platform?: string
+    userId?: string
+    channelId?: string
+    guildId?: string
+    isDirect?: boolean
+}
+
+const toToolSessionFields = (
+    value: unknown
+): LivingMemoryToolSessionFields | null => {
+    if (value == null || typeof value !== 'object') {
+        return null
+    }
+
+    const session = value as Record<string, unknown>
+    return {
+        platform: toNonEmptyString(session.platform),
+        userId: toNonEmptyString(session.userId),
+        channelId: toNonEmptyString(session.channelId),
+        guildId: toNonEmptyString(session.guildId),
+        isDirect: session.isDirect === true
+    }
+}
+
+const isCharacterToolSource = (
+    configurable: LivingMemoryToolConfigurable | undefined
+) => {
+    return (
+        toAgentRunContextFields(configurable?.agentContext)?.source ===
+        'character'
+    )
+}
+
+export type LivingMemoryToolPresetIdResolution =
+    | { ok: true; presetId: string }
+    | { ok: false; reason: 'missing-preset' }
+
+/**
+ * 解析工具调用所属的记忆预设。
+ *
+ * ChatLuna 主链路传入原始 preset；Character 链路传入未加后缀的
+ * presetName，而 Character 记忆统一存于带 characterPresetSuffix 的
+ * 预设下，因此此处按 agentContext.source 判别补后缀。
+ */
+export const resolveToolMemoryPresetId = (
+    configurable: LivingMemoryToolConfigurable | undefined
+): LivingMemoryToolPresetIdResolution => {
+    const preset = toNonEmptyString(configurable?.preset)
+    if (preset == null) {
+        return { ok: false, reason: 'missing-preset' }
+    }
+
+    if (isCharacterToolSource(configurable)) {
+        return { ok: true, presetId: toCharacterMemoryPresetId(preset) }
+    }
+    return { ok: true, presetId: preset }
+}
+
+export type LivingMemoryToolScopeResolution =
+    | { ok: true; scope: MemoryScope }
+    | {
+          ok: false
+          reason:
+              | 'missing-preset'
+              | 'subagent-tool-call'
+              | 'missing-conversation-id'
+              | 'missing-session'
+              | 'missing-session-key'
+      }
+
+/**
+ * 从工具 runtime configurable 重建 MemoryScope。
+ *
+ * ChatLuna 主链路：preset 直接采用（configurable 由 agent_chat_chain 以
+ * preset.triggerKeyword[0] 构造）；conversationId 取自 agentContext，其会话
+ * id 为合成值的子代理运行一律拒绝。Character 链路：conversationId 为平台
+ * 前缀格式，presetName 无后缀，因此按 character_middleware 的规则用
+ * session 重算会话键并补后缀。
+ */
+export const resolveToolMemoryScopeConfigurable = (
+    configurable: LivingMemoryToolConfigurable | undefined
+): LivingMemoryToolScopeResolution => {
+    const presetIdResolution = resolveToolMemoryPresetId(configurable)
+    if (presetIdResolution.ok === false) {
+        return presetIdResolution
+    }
+
+    const agentContext = toAgentRunContextFields(configurable?.agentContext)
+    if (isSubagentRunContext(agentContext)) {
+        return { ok: false, reason: 'subagent-tool-call' }
+    }
+
+    const session = toToolSessionFields(configurable?.session)
+
+    if (isCharacterToolSource(configurable)) {
+        if (session === null) {
+            return { ok: false, reason: 'missing-session' }
+        }
+
+        const conversationId = toCharacterMemoryConversationId(session)
+        if (conversationId == null) {
+            return { ok: false, reason: 'missing-session-key' }
+        }
+
+        return {
+            ok: true,
+            scope: {
+                conversationId,
+                presetId: presetIdResolution.presetId,
+                userId: session.userId,
+                channelId: session.channelId,
+                guildId: session.guildId,
+                isDirect: session.isDirect,
+                speakerId: session.userId,
+                platform: session.platform
+            }
+        }
+    }
+
+    const conversationId = toNonEmptyString(agentContext?.conversationId)
+    if (conversationId == null) {
+        return { ok: false, reason: 'missing-conversation-id' }
+    }
+
+    return {
+        ok: true,
+        scope: {
+            conversationId,
+            presetId: presetIdResolution.presetId,
+            userId: session?.userId,
+            channelId: session?.channelId,
+            guildId: session?.guildId,
+            isDirect: session?.isDirect,
+            speakerId: session?.userId,
+            platform: session?.platform
+        }
+    }
+}
+
+export const describeLivingMemoryToolScopeFailure = (
+    reason: Exclude<LivingMemoryToolScopeResolution, { ok: true }>['reason']
+) => {
+    switch (reason) {
+        case 'missing-preset':
+            return 'Missing preset in the current tool call.'
+        case 'subagent-tool-call':
+            return 'Sub-agent tool calls are not supported by this tool.'
+        case 'missing-conversation-id':
+            return 'Missing conversationId in the current tool call.'
+        case 'missing-session':
+            return 'Missing session in the current tool call.'
+        case 'missing-session-key':
+            return 'Missing user or guild id of the character session in the current tool call.'
+    }
+}

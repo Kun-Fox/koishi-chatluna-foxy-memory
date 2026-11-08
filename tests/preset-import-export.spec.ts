@@ -1,0 +1,416 @@
+import assert from 'node:assert/strict'
+import { withLivingMemoryRepository } from './persistence-test-utils'
+import type {
+    LivingMemoryPresetExport,
+    LivingMemoryPresetExportEntry
+} from '../src/contracts/memory'
+import { createPresetImportId } from '../src/service/persistence/normalizers'
+import { createSyntheticSpeakerLabel } from '../src/service/memory/speaker_identity'
+
+const createExportEntry = (
+    id: string,
+    index: number
+): LivingMemoryPresetExportEntry => ({
+    id,
+    type: 'fact',
+    status: 'active',
+    content: `memory-${index}`,
+    keywords: [`keyword-${index}`],
+    summary: null,
+    sentiment: null,
+    importance: null,
+    sourceConversationId: `conversation-${index}`,
+    sourceOrigins: [],
+    createdAt: '2026-08-06T00:00:00.000Z',
+    updatedAt: '2026-08-06T00:00:00.000Z'
+})
+
+it('copies preset data without moving source records', async () => {
+    await withLivingMemoryRepository(async (_ctx, repository) => {
+        const sourcePresetId = 'preset-source'
+        const targetPresetId = 'preset-target'
+        const sourceMemory = await repository.createMemory(
+            {
+                conversationId: 'conversation-source',
+                presetId: sourcePresetId,
+                platform: 'onebot',
+                speakerId: 'user-1'
+            },
+            {
+                type: 'fact',
+                content: 'source memory'
+            }
+        )
+        await repository.replaceUserProfile(sourcePresetId, {
+            speakerKey: 'speaker-key',
+            speakerLabel: 'Speaker',
+            content: 'source profile',
+            sourceMemoryIds: [sourceMemory.id]
+        })
+        await repository.upsertPresetSpeaker({
+            presetId: sourcePresetId,
+            speakerKey: 'speaker-key',
+            speakerLabel: 'Speaker'
+        })
+
+        const exported = await repository.exportPresetData(sourcePresetId)
+        if (exported.version !== 5) {
+            throw new Error('expected version 5 preset export')
+        }
+        const sourceProfile = exported.userProfiles[0]
+
+        await repository.importPresetData(targetPresetId, exported)
+
+        const retainedSourceMemories =
+            await repository.listEntriesByPreset(sourcePresetId)
+        const importedTargetMemories =
+            await repository.listEntriesByPreset(targetPresetId)
+        assert.deepEqual(
+            retainedSourceMemories.map((entry) => entry.id),
+            [sourceMemory.id]
+        )
+        assert.equal(importedTargetMemories.length, 1)
+        assert.notEqual(importedTargetMemories[0].id, sourceMemory.id)
+        assert.equal(importedTargetMemories[0].content, sourceMemory.content)
+        assert.deepEqual(
+            importedTargetMemories[0].speakerKeys,
+            sourceMemory.speakerKeys
+        )
+        assert.deepEqual(
+            await repository.listActiveMemorySpeakerLinks(targetPresetId, [
+                sourceMemory.speakerKeys[0]
+            ]),
+            [
+                {
+                    speakerKey: sourceMemory.speakerKeys[0],
+                    memoryId: importedTargetMemories[0].id
+                }
+            ]
+        )
+
+        const retainedSourceProfiles =
+            await repository.listUserProfilesByPreset(sourcePresetId)
+        const importedTargetProfiles =
+            await repository.listUserProfilesByPreset(targetPresetId)
+        assert.deepEqual(
+            retainedSourceProfiles.map((profile) => profile.id),
+            [sourceProfile.id]
+        )
+        assert.equal(importedTargetProfiles.length, 1)
+        assert.notEqual(importedTargetProfiles[0].id, sourceProfile.id)
+        assert.deepEqual(importedTargetProfiles[0].sourceMemoryIds, [
+            importedTargetMemories[0].id
+        ])
+
+        assert.equal(
+            (await repository.listPresetSpeakers(sourcePresetId)).length,
+            1
+        )
+        const targetSpeakers =
+            await repository.listPresetSpeakers(targetPresetId)
+        assert.equal(targetSpeakers.length, 2)
+        // 导出文件的注册行不含记忆实际关联的用户时，导入为该键合成注册行
+        assert.equal(
+            targetSpeakers.find(
+                (speaker) => speaker.speakerKey === sourceMemory.speakerKeys[0]
+            )?.speakerLabel,
+            createSyntheticSpeakerLabel(sourceMemory.speakerKeys[0])
+        )
+
+        await repository.importPresetData(targetPresetId, exported)
+        assert.deepEqual(
+            (await repository.listEntriesByPreset(targetPresetId)).map(
+                (entry) => entry.id
+            ),
+            [importedTargetMemories[0].id]
+        )
+        assert.deepEqual(
+            (await repository.listUserProfilesByPreset(targetPresetId)).map(
+                (profile) => profile.id
+            ),
+            [importedTargetProfiles[0].id]
+        )
+    })
+})
+
+it('exports v5 and imports historical entries with obsolete metadata', async () => {
+    await withLivingMemoryRepository(async (_ctx, repository) => {
+        const presetId = 'preset-import'
+        const data = {
+            version: 2 as const,
+            exportedAt: '2026-10-28T00:00:00.000Z',
+            sourcePresetId: presetId,
+            entries: [
+                { ...createExportEntry('legacy', 1), isConsolidated: true }
+            ],
+            userProfiles: [],
+            presetSpeakers: []
+        }
+        await repository.importPresetData(presetId, data)
+        const exported = await repository.exportPresetData(presetId)
+        assert.equal(exported.version, 5)
+        assert.equal(exported.entries[0].content, 'memory-1')
+        assert.equal(
+            Object.hasOwn(exported.entries[0], 'isConsolidated'),
+            false
+        )
+        await repository.importPresetData(presetId, exported)
+        assert.equal((await repository.listEntriesByPreset(presetId)).length, 1)
+    })
+})
+
+it('synthesizes registry rows for keys missing from version 3 imports', async () => {
+    await withLivingMemoryRepository(async (_ctx, repository) => {
+        const targetPresetId = 'version-3-speakers'
+        // 目标预设已有同键完整行：合成不得覆盖其昵称与身份字段
+        await repository.upsertPresetSpeaker({
+            presetId: targetPresetId,
+            speakerKey: 'known-key',
+            speakerLabel: '既有昵称',
+            speakerId: 'user-1',
+            platform: 'onebot'
+        })
+        const data: LivingMemoryPresetExport = {
+            version: 3,
+            exportedAt: '2026-08-06T00:00:00.000Z',
+            sourcePresetId: 'preset-legacy',
+            entries: [
+                {
+                    ...createExportEntry('version-3-entry', 1),
+                    speakerKeys: ['known-key', 'unknown-key']
+                }
+            ],
+            userProfiles: [],
+            presetSpeakers: []
+        }
+
+        await repository.importPresetData(targetPresetId, data)
+
+        const speakers = await repository.listPresetSpeakers(targetPresetId)
+        const known = speakers.find(
+            (speaker) => speaker.speakerKey === 'known-key'
+        )
+        assert.equal(known?.speakerLabel, '既有昵称')
+        assert.equal(known?.speakerId, 'user-1')
+        const unknown = speakers.find(
+            (speaker) => speaker.speakerKey === 'unknown-key'
+        )
+        assert.equal(unknown?.speakerLabel, 'user:unknown-')
+        assert.equal(unknown?.speakerId, null)
+    })
+})
+
+it('round-trips memory source labels through version 5 exports', async () => {
+    await withLivingMemoryRepository(async (_ctx, repository) => {
+        const sourcePresetId = 'preset-source-label'
+        const targetPresetId = 'preset-target-label'
+        const sourceLabel = '来源于「测试群」（群聊 ID：10000）的群聊'
+        const [memory] = await repository.appendMemories(
+            { conversationId: 'group:10000', presetId: sourcePresetId },
+            [
+                {
+                    role: 'user',
+                    content: 'group memory',
+                    transcriptLines: ['group memory']
+                }
+            ],
+            [
+                {
+                    type: 'fact',
+                    content: 'group memory',
+                    keywords: ['group'],
+                    summary: 'group summary',
+                    sentiment: 'neutral',
+                    importance: 0.5,
+                    speakerKeys: []
+                }
+            ],
+            sourceLabel
+        )
+        assert.equal(memory.sourceLabel, sourceLabel)
+
+        const exported = await repository.exportPresetData(sourcePresetId)
+        if (exported.version !== 5) {
+            throw new Error('expected version 5 preset export')
+        }
+        assert.equal(exported.entries[0].sourceLabel, sourceLabel)
+
+        await repository.importPresetData(targetPresetId, exported)
+        assert.equal(
+            (await repository.listEntriesByPreset(targetPresetId))[0]
+                .sourceLabel,
+            sourceLabel
+        )
+
+        const legacy: LivingMemoryPresetExport = { ...exported, version: 3 }
+        await repository.importPresetData(sourcePresetId, legacy)
+        assert.equal(
+            (await repository.listEntriesByPreset(sourcePresetId))[0]
+                .sourceLabel,
+            null
+        )
+    })
+})
+
+it('preserves record ids when restoring the source preset', async () => {
+    await withLivingMemoryRepository(async (_ctx, repository) => {
+        const presetId = 'preset-restore'
+        const memory = await repository.createMemory(
+            {
+                conversationId: 'conversation-restore',
+                presetId
+            },
+            {
+                type: 'fact',
+                content: 'original memory'
+            },
+            ['original-speaker']
+        )
+        const exported = await repository.exportPresetData(presetId)
+
+        const retained = await repository.createMemory(
+            {
+                conversationId: 'conversation-retained',
+                presetId
+            },
+            {
+                type: 'fact',
+                content: 'retained memory'
+            },
+            ['retained-speaker']
+        )
+
+        await repository.updateMemory(memory.id, {
+            content: 'changed memory',
+            speakerKeys: ['temporary-speaker']
+        })
+        await repository.importPresetData(presetId, exported)
+
+        const restored = await repository.listEntriesByPreset(presetId)
+        assert.equal(restored.length, 2)
+        assert.equal(
+            restored.find((entry) => entry.id === memory.id)?.content,
+            'original memory'
+        )
+        assert.deepEqual(
+            await repository.listActiveMemorySpeakerLinks(presetId, [
+                'original-speaker',
+                'temporary-speaker',
+                'retained-speaker'
+            ]),
+            [
+                {
+                    speakerKey: 'original-speaker',
+                    memoryId: memory.id
+                },
+                {
+                    speakerKey: 'retained-speaker',
+                    memoryId: retained.id
+                }
+            ]
+        )
+    })
+})
+
+it('imports large preset exports in bounded batches', async () => {
+    await withLivingMemoryRepository(async (_ctx, repository) => {
+        const targetPresetId = 'large-import-target'
+        const entries = Array.from({ length: 1001 }, (_, index) =>
+            createExportEntry(index.toString(16).padStart(64, '0'), index)
+        )
+        const data: LivingMemoryPresetExport = {
+            version: 1,
+            exportedAt: '2026-08-06T00:00:00.000Z',
+            sourcePresetId: 'large-import-source',
+            entries,
+            userProfiles: Array.from({ length: 101 }, (_, index) => ({
+                id: `profile-${index}`,
+                speakerKey: `speaker-${index}`,
+                speakerLabel: `Speaker ${index}`,
+                content: `profile-${index}`,
+                sourceMemoryIds: [entries[index].id],
+                createdAt: '2026-08-06T00:00:00.000Z',
+                updatedAt: '2026-08-06T00:00:00.000Z'
+            })),
+            presetSpeakers: Array.from({ length: 101 }, (_, index) => ({
+                speakerKey: `speaker-${index}`,
+                speakerLabel: `Speaker ${index}`,
+                speakerId: null,
+                createdAt: '2026-08-06T00:00:00.000Z',
+                updatedAt: '2026-08-06T00:00:00.000Z'
+            }))
+        }
+
+        const result = await repository.importPresetData(targetPresetId, data)
+
+        assert.deepEqual(result, {
+            entries: 1001,
+            userProfiles: 101,
+            presetSpeakers: 101
+        })
+        assert.equal(
+            (await repository.listEntriesByPreset(targetPresetId)).length,
+            1001
+        )
+        const profiles =
+            await repository.listUserProfilesByPreset(targetPresetId)
+        assert.equal(profiles.length, 101)
+        const firstProfile = profiles.find(
+            (profile) => profile.speakerKey === 'speaker-0'
+        )
+        assert.ok(firstProfile)
+        assert.deepEqual(firstProfile.sourceMemoryIds, [
+            createPresetImportId('entry', targetPresetId, entries[0].id)
+        ])
+        assert.equal(
+            (await repository.listPresetSpeakers(targetPresetId)).length,
+            101
+        )
+        assert.deepEqual(await repository.listJobsByPreset(targetPresetId), [])
+    })
+})
+
+it('rolls back all batches when a later import batch fails', async () => {
+    await withLivingMemoryRepository(async (_ctx, repository) => {
+        const targetPresetId = 'rollback-import-target'
+        const entries = Array.from({ length: 102 }, (_, index) => {
+            const id =
+                index < 100
+                    ? index.toString(16).padStart(64, '0')
+                    : 'f'.repeat(64)
+            return createExportEntry(id, index)
+        })
+        const data: LivingMemoryPresetExport = {
+            version: 1,
+            exportedAt: '2026-08-06T00:00:00.000Z',
+            sourcePresetId: 'rollback-import-source',
+            entries,
+            userProfiles: [],
+            presetSpeakers: []
+        }
+
+        await assert.rejects(
+            repository.importPresetData(targetPresetId, data),
+            /preset import failed during entries batch 2\/2/
+        )
+        assert.deepEqual(
+            await repository.listEntriesByPreset(targetPresetId),
+            []
+        )
+
+        const created = await repository.createMemory(
+            {
+                conversationId: 'rollback-health-check',
+                presetId: targetPresetId
+            },
+            {
+                type: 'fact',
+                content: 'database remains writable after rollback'
+            }
+        )
+        assert.equal(
+            created.content,
+            'database remains writable after rollback'
+        )
+    })
+})

@@ -1,0 +1,863 @@
+import { MemoryInputError } from '../memory/errors'
+import { randomUUID } from 'crypto'
+import { $, Context } from 'koishi'
+import type {
+    MemoryEntryRecord,
+    MemoryMutationInput,
+    MemoryScope,
+    MemorySourceMessage,
+    MemoryUpdatePatch
+} from '../../contracts/memory'
+import type {
+    LegacyMemoryEmbeddingRecord,
+    MemoryIndexSourceRecord
+} from '../../contracts/vector_index'
+import type {
+    AttributedMemoryItem,
+    DreamMemoryEntryRecord,
+    RecallRepository,
+    UserProfileMemoryRepository
+} from '../../contracts/workflows'
+import {
+    normalizeMemoryImportance,
+    normalizeMemoryKeywords,
+    normalizeMemoryText,
+    normalizeOptionalMemoryText
+} from '../memory/entry_fields'
+import {
+    createSourceOriginsFromMessages,
+    mergeMemorySourceOrigins
+} from '../memory/origins/source_origins'
+import {
+    createActiveMemorySpeakerRows,
+    normalizeEntryRecord,
+    normalizeSourceConversationId
+} from './normalizers'
+import type { LivingMemoryTransact, LivingMemoryTransaction } from './types'
+import {
+    normalizeSpeakerKeys,
+    resolveScopeSpeakerKeys
+} from '../memory/speaker_identity'
+
+const sourceOriginsArrayMigrationId = 'source-origins-array-v1'
+const legacyEmbeddingMigrationId = 'legacy-embedding-vector-index-v1'
+const activeMemorySpeakersMigrationId = 'active-memory-speakers-v1'
+const webuiSourceConversationMigrationId =
+    'webui-source-conversation-cleanup-v1'
+// 历史版本 WebUI 手工创建写入的伪会话键前缀，本次迁移将其写回为 null（无会话归属）。
+const legacyWebuiConversationPrefix = 'webui:'
+/**
+ * 回填按页读取记忆、按批写入关联行。一条记忆展开出多条关联行，两者不是同一
+ * 量纲，因此各自设界。
+ */
+const ACTIVE_MEMORY_SPEAKER_PAGE_SIZE = 500
+const ACTIVE_MEMORY_SPEAKER_BATCH_SIZE = 500
+const memoryEntryFields: (keyof MemoryEntryRecord)[] = [
+    'id',
+    'presetId',
+    'speakerKeys',
+    'type',
+    'status',
+    'content',
+    'keywords',
+    'summary',
+    'sentiment',
+    'importance',
+    'sourceConversationId',
+    'sourceLabel',
+    'sourceOrigins',
+    'createdAt',
+    'updatedAt'
+]
+const indexSourceFields: (keyof MemoryEntryRecord)[] = [
+    'id',
+    'presetId',
+    'sourceConversationId',
+    'status',
+    'type',
+    'content',
+    'keywords',
+    'updatedAt'
+]
+const dreamEntryFields: (keyof MemoryEntryRecord)[] = [
+    'id',
+    'presetId',
+    'speakerKeys',
+    'type',
+    'content',
+    'keywords',
+    'summary',
+    'sentiment',
+    'importance',
+    'sourceLabel',
+    'createdAt',
+    'updatedAt'
+]
+const recallEntryFields: (keyof MemoryEntryRecord)[] = [
+    'id',
+    'type',
+    'content',
+    'keywords',
+    'summary',
+    'sentiment',
+    'importance',
+    'sourceLabel',
+    'createdAt',
+    'updatedAt'
+]
+
+export class LivingMemoryEntryRepository
+    implements RecallRepository, UserProfileMemoryRepository
+{
+    constructor(
+        private readonly ctx: Context,
+        private readonly transact: LivingMemoryTransact
+    ) {}
+
+    /**
+     * 回填活跃记忆的用户关联行。读取按 id 游标分页，峰值内存只与单页记忆条数
+     * 相关；分页与写入同处一个事务，保持要么整体生效要么不生效的语义与迁移
+     * 标记的幂等性。
+     */
+    async migrateActiveMemorySpeakers(): Promise<number> {
+        return await this.transact(async (database) => {
+            const applied = await database.get('living_memory_migration', {
+                id: activeMemorySpeakersMigrationId
+            })
+            if (applied.length > 0) {
+                return 0
+            }
+
+            let cursor: string | null = null
+            let rowCount = 0
+            while (true) {
+                const entries = await this.selectActiveMemorySpeakerPage(
+                    database,
+                    cursor,
+                    ACTIVE_MEMORY_SPEAKER_PAGE_SIZE
+                )
+                if (entries.length === 0) {
+                    break
+                }
+
+                const rows = entries.flatMap(createActiveMemorySpeakerRows)
+                for (
+                    let offset = 0;
+                    offset < rows.length;
+                    offset += ACTIVE_MEMORY_SPEAKER_BATCH_SIZE
+                ) {
+                    await database.upsert(
+                        'living_memory_entry_speaker',
+                        rows.slice(
+                            offset,
+                            offset + ACTIVE_MEMORY_SPEAKER_BATCH_SIZE
+                        )
+                    )
+                }
+                rowCount += rows.length
+                cursor = entries[entries.length - 1].id
+            }
+
+            await database.create('living_memory_migration', {
+                id: activeMemorySpeakersMigrationId,
+                appliedAt: new Date()
+            })
+            return rowCount
+        })
+    }
+
+    private async selectActiveMemorySpeakerPage(
+        database: LivingMemoryTransaction,
+        afterId: string | null,
+        limit: number
+    ) {
+        const selection = database.select('living_memory_entry', {
+            status: 'active'
+        })
+        if (afterId !== null) {
+            selection.where({ id: { $gt: afterId } })
+        }
+        return await selection
+            .orderBy('id', 'asc')
+            .limit(limit)
+            .execute(['id', 'presetId', 'speakerKeys', 'status'])
+    }
+
+    async migrateMemorySourceOriginsArray(): Promise<number> {
+        return await this.transact(async (database) => {
+            const applied = await database.get('living_memory_migration', {
+                id: sourceOriginsArrayMigrationId
+            })
+            if (applied.length > 0) {
+                return 0
+            }
+
+            const entries = await database.get('living_memory_entry', {}, [
+                'id',
+                'sourceOrigins'
+            ])
+            const invalidIds = entries
+                .filter((entry) => !Array.isArray(entry.sourceOrigins))
+                .map((entry) => entry.id)
+
+            if (invalidIds.length > 0) {
+                await database.set(
+                    'living_memory_entry',
+                    { id: { $in: invalidIds } },
+                    { sourceOrigins: [] }
+                )
+            }
+
+            await database.create('living_memory_migration', {
+                id: sourceOriginsArrayMigrationId,
+                appliedAt: new Date()
+            })
+            return invalidIds.length
+        })
+    }
+
+    async migrateWebuiSourceConversationKeys(): Promise<number> {
+        return await this.transact(async (database) => {
+            const applied = await database.get('living_memory_migration', {
+                id: webuiSourceConversationMigrationId
+            })
+            if (applied.length > 0) {
+                return 0
+            }
+
+            const entries = await database.get('living_memory_entry', {}, [
+                'id',
+                'sourceConversationId'
+            ])
+            const legacyIds = entries
+                .filter((entry) =>
+                    (entry.sourceConversationId ?? '').startsWith(
+                        legacyWebuiConversationPrefix
+                    )
+                )
+                .map((entry) => entry.id)
+
+            if (legacyIds.length > 0) {
+                await database.set(
+                    'living_memory_entry',
+                    { id: { $in: legacyIds } },
+                    { sourceConversationId: null }
+                )
+            }
+
+            await database.create('living_memory_migration', {
+                id: webuiSourceConversationMigrationId,
+                appliedAt: new Date()
+            })
+            return legacyIds.length
+        })
+    }
+
+    async hasMigratedLegacyEmbeddings() {
+        const records = await this.ctx.database.get(
+            'living_memory_migration',
+            { id: legacyEmbeddingMigrationId },
+            ['id']
+        )
+        return records.length > 0
+    }
+
+    async completeLegacyEmbeddingMigration() {
+        await this.transact(async (database) => {
+            const records = await database.get(
+                'living_memory_migration',
+                { id: legacyEmbeddingMigrationId },
+                ['id']
+            )
+            if (records.length > 0) {
+                return
+            }
+            await database.set(
+                'living_memory_entry',
+                {},
+                { embedding: null, embeddingModelId: null }
+            )
+            await database.create('living_memory_migration', {
+                id: legacyEmbeddingMigrationId,
+                appliedAt: new Date()
+            })
+        })
+    }
+
+    async listEntriesByPreset(presetId: string): Promise<MemoryEntryRecord[]> {
+        const entries = await this.ctx.database.get(
+            'living_memory_entry',
+            { presetId },
+            memoryEntryFields
+        )
+
+        return entries.map(normalizeEntryRecord)
+    }
+
+    async listArchivedEntriesBefore(presetId: string, updatedBefore: Date) {
+        return await this.ctx.database.get(
+            'living_memory_entry',
+            {
+                presetId,
+                status: 'archived',
+                updatedAt: { $lte: updatedBefore }
+            },
+            ['id', 'importance', 'updatedAt']
+        )
+    }
+
+    async listDreamEntriesByPreset(
+        presetId: string
+    ): Promise<DreamMemoryEntryRecord[]> {
+        return await this.ctx.database.get(
+            'living_memory_entry',
+            { presetId, status: 'active' },
+            dreamEntryFields
+        )
+    }
+
+    async listActiveMemorySpeakerKeys(presetId: string): Promise<string[]> {
+        const rows = await this.ctx.database
+            .select('living_memory_entry_speaker', { presetId })
+            .groupBy('speakerKey')
+            .execute(['speakerKey'])
+        return rows.map((row) => row.speakerKey).sort()
+    }
+
+    async listActiveMemorySpeakerLinks(
+        presetId: string,
+        speakerKeys: string[]
+    ) {
+        if (speakerKeys.length === 0) {
+            return []
+        }
+
+        const links = await this.ctx.database.get(
+            'living_memory_entry_speaker',
+            { presetId, speakerKey: { $in: speakerKeys } },
+            ['speakerKey', 'memoryId']
+        )
+        return links.sort(
+            (left, right) =>
+                left.speakerKey.localeCompare(right.speakerKey) ||
+                left.memoryId.localeCompare(right.memoryId)
+        )
+    }
+
+    async listEntryIndexSourcePage(
+        afterId: string | null,
+        limit: number
+    ): Promise<MemoryIndexSourceRecord[]> {
+        return this.selectEntryIndexSourcePage(null, afterId, limit)
+    }
+
+    async listEntryIndexSourcePageByPreset(
+        presetId: string,
+        afterId: string | null,
+        limit: number
+    ): Promise<MemoryIndexSourceRecord[]> {
+        return this.selectEntryIndexSourcePage(presetId, afterId, limit)
+    }
+
+    private async selectEntryIndexSourcePage(
+        presetId: string | null,
+        afterId: string | null,
+        limit: number
+    ): Promise<MemoryIndexSourceRecord[]> {
+        const selection =
+            presetId === null
+                ? this.ctx.database.select('living_memory_entry')
+                : this.ctx.database.select('living_memory_entry', { presetId })
+        if (afterId !== null) {
+            selection.where({ id: { $gt: afterId } })
+        }
+        const records = await selection
+            .orderBy('id', 'asc')
+            .limit(limit)
+            .execute(indexSourceFields)
+        return records.map((record) => ({
+            ...record,
+            sourceConversationId: normalizeSourceConversationId(
+                record.sourceConversationId
+            )
+        }))
+    }
+
+    async listLegacyEmbeddingPage(
+        afterId: string | null,
+        limit: number
+    ): Promise<LegacyMemoryEmbeddingRecord[]> {
+        const selection = this.ctx.database.select('living_memory_entry')
+        if (afterId !== null) {
+            selection.where({ id: { $gt: afterId } })
+        }
+        return await selection
+            .orderBy('id', 'asc')
+            .limit(limit)
+            .execute(['id', 'embedding', 'embeddingModelId'])
+    }
+
+    countEntriesByPreset(presetId: string) {
+        return this.ctx.database.eval(
+            'living_memory_entry',
+            (entry) => $.count(entry.id),
+            {
+                presetId
+            }
+        )
+    }
+
+    countEntries() {
+        return this.ctx.database.eval('living_memory_entry', (entry) =>
+            $.count(entry.id)
+        )
+    }
+
+    async listEntryPresetIds() {
+        const entries = await this.ctx.database
+            .select('living_memory_entry')
+            .groupBy('presetId')
+            .execute(['presetId'])
+        return entries.map((entry) => entry.presetId).sort()
+    }
+
+    countActiveEntries(presetId: string) {
+        return this.ctx.database.eval(
+            'living_memory_entry',
+            (entry) => $.count(entry.id),
+            {
+                presetId,
+                status: 'active'
+            }
+        )
+    }
+
+    async getEntryById(id: string): Promise<MemoryEntryRecord | undefined> {
+        const record = (
+            await this.ctx.database.get(
+                'living_memory_entry',
+                { id },
+                memoryEntryFields
+            )
+        )[0]
+
+        return record == null ? undefined : normalizeEntryRecord(record)
+    }
+
+    async getEntriesByPresetAndIds(
+        presetId: string,
+        ids: string[]
+    ): Promise<MemoryEntryRecord[]> {
+        if (ids.length === 0) {
+            return []
+        }
+
+        const entries = await this.ctx.database.get(
+            'living_memory_entry',
+            {
+                presetId,
+                id: {
+                    $in: ids
+                }
+            },
+            memoryEntryFields
+        )
+
+        return entries.map(normalizeEntryRecord)
+    }
+
+    async getSearchEntriesByPresetAndIds(presetId: string, ids: string[]) {
+        if (ids.length === 0) {
+            return []
+        }
+
+        return await this.ctx.database.get(
+            'living_memory_entry',
+            {
+                presetId,
+                id: { $in: ids }
+            },
+            recallEntryFields
+        )
+    }
+
+    async appendMemories(
+        scope: MemoryScope,
+        sourceOriginMessages: MemorySourceMessage[],
+        extracted: AttributedMemoryItem[],
+        sourceLabel?: string | null
+    ) {
+        if (extracted.length === 0) {
+            return []
+        }
+
+        const now = new Date()
+        const sourceOrigins =
+            createSourceOriginsFromMessages(sourceOriginMessages)
+        const normalizedSourceLabel = normalizeOptionalMemoryText(sourceLabel)
+        const records = extracted.map((item) =>
+            this.buildMemoryEntry(
+                scope,
+                item,
+                sourceOrigins,
+                normalizedSourceLabel,
+                now,
+                item.speakerKeys
+            )
+        )
+        await this.transact(async (database) => {
+            await database.upsert('living_memory_entry', records)
+            await this.replaceActiveMemorySpeakers(database, records)
+        })
+        return records
+    }
+
+    async createMemory(
+        scope: MemoryScope,
+        input: MemoryMutationInput,
+        speakerKeys?: string[]
+    ) {
+        const record = this.buildMemoryEntry(
+            scope,
+            input,
+            [],
+            null,
+            new Date(),
+            speakerKeys ?? resolveScopeSpeakerKeys(scope)
+        )
+        await this.transact(async (database) => {
+            await database.create('living_memory_entry', record)
+            await this.replaceActiveMemorySpeakers(database, [record])
+        })
+        return record
+    }
+
+    private buildMemoryEntry(
+        scope: MemoryScope,
+        fields: MemoryMutationInput,
+        sourceOrigins: MemoryEntryRecord['sourceOrigins'],
+        sourceLabel: string | null,
+        createdAt: Date,
+        speakerKeys: string[]
+    ): MemoryEntryRecord {
+        return {
+            id: randomUUID(),
+            presetId: scope.presetId,
+            speakerKeys: normalizeSpeakerKeys(speakerKeys),
+            type: fields.type,
+            status: fields.status ?? 'active',
+            content: normalizeMemoryText(fields.content),
+            keywords: normalizeMemoryKeywords(fields.keywords),
+            summary: normalizeOptionalMemoryText(fields.summary),
+            sentiment: normalizeOptionalMemoryText(fields.sentiment),
+            importance: normalizeMemoryImportance(fields.importance),
+            // 空串表示无会话上下文（WebUI 手工创建），落库归一为 null，
+            // 使「全局可见」只依赖 sourceConversationId == null 单一判定。
+            sourceConversationId: scope.conversationId.trim() || null,
+            sourceLabel,
+            sourceOrigins,
+            createdAt,
+            updatedAt: createdAt
+        }
+    }
+
+    async updateMemory(id: string, patch: MemoryUpdatePatch) {
+        const current = await this.getEntryById(id)
+        if (current == null) {
+            return null
+        }
+        const fields = this.buildMemoryUpdatePatch(current, patch)
+        const speakersChanged =
+            fields.status !== current.status ||
+            fields.speakerKeys.length !== current.speakerKeys.length ||
+            fields.speakerKeys.some(
+                (speakerKey, index) => speakerKey !== current.speakerKeys[index]
+            )
+        return await this.transact(async (database) => {
+            const update = {
+                ...fields,
+                updatedAt: new Date()
+            }
+            const record = { ...current, ...update }
+            await database.set(
+                'living_memory_entry',
+                { id: current.id },
+                update
+            )
+            if (speakersChanged) {
+                await this.replaceActiveMemorySpeakers(database, [record])
+            }
+            return {
+                record,
+                contentChanged: record.content !== current.content
+            }
+        })
+    }
+
+    async archiveActiveEntries(presetId: string, ids: string[]) {
+        if (ids.length === 0) {
+            return []
+        }
+        const records = (
+            await this.getEntriesByPresetAndIds(presetId, ids)
+        ).filter((record) => record.status === 'active')
+        if (records.length === 0) {
+            return []
+        }
+
+        const updatedAt = new Date()
+        const archived = records.map((record) => ({
+            ...record,
+            status: 'archived' as const,
+            updatedAt
+        }))
+        await this.transact(async (database) => {
+            await database.set(
+                'living_memory_entry',
+                {
+                    presetId,
+                    status: 'active',
+                    id: { $in: records.map((record) => record.id) }
+                },
+                { status: 'archived', updatedAt }
+            )
+            await this.replaceActiveMemorySpeakers(database, archived)
+        })
+        return archived
+    }
+
+    async splitMemory(
+        presetId: string,
+        sourceMemoryId: string,
+        memories: AttributedMemoryItem[]
+    ) {
+        if (memories.length < 2) {
+            throw new MemoryInputError('拆分结果至少需要两条记忆。')
+        }
+        return this.transact(async (database) => {
+            const [row] = await database.get(
+                'living_memory_entry',
+                { presetId, id: sourceMemoryId, status: 'active' },
+                memoryEntryFields
+            )
+            if (row === undefined) {
+                throw new MemoryInputError(
+                    `不存在 ID 为 ${sourceMemoryId} 的记忆，请重新查明记忆 ID 后再调用。`
+                )
+            }
+            const source = normalizeEntryRecord(row)
+            const now = new Date()
+            const records = memories.map((memory) => {
+                const record = this.buildMemoryEntry(
+                    {
+                        presetId,
+                        conversationId: source.sourceConversationId ?? ''
+                    },
+                    memory,
+                    source.sourceOrigins,
+                    source.sourceLabel,
+                    now,
+                    memory.speakerKeys
+                )
+                return record
+            })
+            await database.upsert('living_memory_entry', records)
+            await database.set(
+                'living_memory_entry',
+                { presetId, id: sourceMemoryId },
+                { status: 'archived', updatedAt: now }
+            )
+            const archivedSource = {
+                ...source,
+                status: 'archived' as const,
+                updatedAt: now
+            }
+            await this.replaceActiveMemorySpeakers(database, [
+                ...records,
+                archivedSource
+            ])
+            return { memories: records, archivedSource }
+        })
+    }
+
+    async mergeMemories(
+        presetId: string,
+        sourceMemoryIds: string[],
+        memory: AttributedMemoryItem
+    ) {
+        const sourceIds = new Set(sourceMemoryIds)
+        if (sourceIds.size < 2 || sourceIds.size !== sourceMemoryIds.length) {
+            throw new MemoryInputError(
+                '合并来源至少需要两条记忆，ID 不得重复。'
+            )
+        }
+        return this.transact(async (database) => {
+            const entries = (
+                await database.get(
+                    'living_memory_entry',
+                    {
+                        presetId,
+                        id: { $in: sourceMemoryIds },
+                        status: 'active'
+                    },
+                    memoryEntryFields
+                )
+            ).map(normalizeEntryRecord)
+            const entryById = new Map(entries.map((entry) => [entry.id, entry]))
+            const sources = sourceMemoryIds.map((id) => {
+                const entry = entryById.get(id)
+                if (entry === undefined) {
+                    throw new MemoryInputError(
+                        `不存在 ID 为 ${id} 的记忆，请重新查明记忆 ID 后再调用。`
+                    )
+                }
+                return entry
+            })
+            const sameConversation = sources.every(
+                (source) =>
+                    source.sourceConversationId ===
+                    sources[0].sourceConversationId
+            )
+            const sameLabel = sources.every(
+                (source) => source.sourceLabel === sources[0].sourceLabel
+            )
+            const now = new Date()
+            const record = this.buildMemoryEntry(
+                {
+                    presetId,
+                    conversationId: sameConversation
+                        ? (sources[0].sourceConversationId ?? '')
+                        : ''
+                },
+                memory,
+                mergeMemorySourceOrigins(sources),
+                sameConversation && sameLabel ? sources[0].sourceLabel : null,
+                now,
+                memory.speakerKeys
+            )
+            await database.create('living_memory_entry', record)
+            await database.set(
+                'living_memory_entry',
+                { presetId, id: { $in: sourceMemoryIds } },
+                { status: 'archived', updatedAt: now }
+            )
+            const archivedSources = sources.map((source) => ({
+                ...source,
+                status: 'archived' as const,
+                updatedAt: now
+            }))
+            await this.replaceActiveMemorySpeakers(database, [
+                record,
+                ...archivedSources
+            ])
+            return { memory: record, archivedSources }
+        })
+    }
+
+    async deleteMemory(id: string) {
+        const current = await this.getEntryById(id)
+        if (current == null) {
+            return null
+        }
+        await this.transact(async (database) => {
+            await database.remove('living_memory_entry', { id })
+            await database.remove('living_memory_entry_speaker', {
+                presetId: current.presetId,
+                memoryId: id
+            })
+        })
+        return current
+    }
+
+    async deleteEntries(presetId: string, ids: string[]) {
+        if (ids.length === 0) {
+            return
+        }
+        await this.transact(async (database) => {
+            await database.remove('living_memory_entry', {
+                presetId,
+                id: { $in: ids }
+            })
+            await database.remove('living_memory_entry_speaker', {
+                presetId,
+                memoryId: { $in: ids }
+            })
+        })
+    }
+
+    private async replaceActiveMemorySpeakers(
+        database: LivingMemoryTransaction,
+        entries: Pick<
+            MemoryEntryRecord,
+            'id' | 'presetId' | 'speakerKeys' | 'status'
+        >[]
+    ) {
+        if (entries.length === 0) {
+            return
+        }
+
+        // 按 presetId 分组删除：入参每条记录自带 presetId，写入侧也按各自的
+        // presetId 生成关联行，删除侧必须保持同一口径，否则跨预设批次会残留
+        // 旧关联行。删除条件保留 presetId 以命中 (presetId, memoryId) 索引。
+        const memoryIdsByPreset = new Map<string, string[]>()
+        for (const entry of entries) {
+            const memoryIds = memoryIdsByPreset.get(entry.presetId)
+            if (memoryIds == null) {
+                memoryIdsByPreset.set(entry.presetId, [entry.id])
+            } else {
+                memoryIds.push(entry.id)
+            }
+        }
+        for (const [presetId, memoryIds] of memoryIdsByPreset) {
+            await database.remove('living_memory_entry_speaker', {
+                presetId,
+                memoryId: { $in: memoryIds }
+            })
+        }
+
+        const rows = entries.flatMap(createActiveMemorySpeakerRows)
+        if (rows.length > 0) {
+            await database.upsert('living_memory_entry_speaker', rows)
+        }
+    }
+
+    private buildMemoryUpdatePatch(
+        current: MemoryEntryRecord,
+        patch: Partial<MemoryMutationInput> & { speakerKeys?: string[] }
+    ) {
+        const content =
+            patch.content === undefined
+                ? current.content
+                : normalizeMemoryText(patch.content)
+        const keywords =
+            patch.keywords === undefined
+                ? current.keywords
+                : normalizeMemoryKeywords(patch.keywords)
+        const summary =
+            patch.summary === undefined
+                ? current.summary
+                : normalizeOptionalMemoryText(patch.summary)
+        const status =
+            patch.status === undefined ? current.status : patch.status
+        const sentiment =
+            patch.sentiment === undefined ? current.sentiment : patch.sentiment
+        const importance =
+            patch.importance === undefined
+                ? current.importance
+                : patch.importance
+        const speakerKeys =
+            patch.speakerKeys === undefined
+                ? current.speakerKeys
+                : normalizeSpeakerKeys(patch.speakerKeys)
+        return {
+            speakerKeys,
+            type: patch.type ?? current.type,
+            status,
+            content,
+            keywords,
+            summary,
+            sentiment: normalizeOptionalMemoryText(sentiment),
+            importance: normalizeMemoryImportance(importance)
+        }
+    }
+}

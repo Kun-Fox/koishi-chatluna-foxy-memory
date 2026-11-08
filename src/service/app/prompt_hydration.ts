@@ -1,0 +1,58 @@
+import type { MemoryScope } from '../../contracts/memory'
+import type { SnapshotRepository } from '../../contracts/workflows'
+import { renderSnapshotText } from '../memory/snapshot/snapshot_text'
+import type { LivingMemoryUserProfileService } from '../user_profile'
+
+export interface LivingMemoryPromptHydrationDependencies {
+    snapshots: Pick<SnapshotRepository, 'getLatestSnapshotByScope'>
+    userProfiles: LivingMemoryUserProfileService
+}
+
+export interface LivingMemoryPromptSectionsOptions {
+    includeSnapshot?: boolean
+    speakerKeys?: string[]
+}
+
+const loadSnapshotText = async (
+    dependencies: Pick<LivingMemoryPromptHydrationDependencies, 'snapshots'>,
+    scope: Pick<MemoryScope, 'presetId' | 'conversationId'>
+) => {
+    const snapshot =
+        await dependencies.snapshots.getLatestSnapshotByScope(scope)
+    return renderSnapshotText(snapshot?.items ?? [])
+}
+
+export const hydrateLivingMemoryPromptSections = async (
+    dependencies: LivingMemoryPromptHydrationDependencies,
+    scope: Pick<MemoryScope, 'presetId' | 'conversationId'>,
+    options: LivingMemoryPromptSectionsOptions = {}
+) => {
+    const [snapshot, userProfiles] = await Promise.all([
+        options.includeSnapshot === false
+            ? Promise.resolve('')
+            : loadSnapshotText(dependencies, scope),
+        dependencies.userProfiles.renderForSpeakers(
+            scope.presetId,
+            options.speakerKeys ?? []
+        )
+    ])
+
+    return {
+        snapshot: snapshot.trim(),
+        userProfiles: userProfiles.trim()
+    }
+}
+
+export const formatLivingMemoryInjection = (sections: {
+    snapshot: string
+    userProfiles: string
+}) => {
+    const parts: string[] = []
+    if (sections.userProfiles.length > 0) {
+        parts.push(`## 用户画像\n${sections.userProfiles}`)
+    }
+    if (sections.snapshot.length > 0) {
+        parts.push(`## 短期记忆\n${sections.snapshot}`)
+    }
+    return parts.join('\n\n')
+}

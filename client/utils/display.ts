@@ -1,0 +1,140 @@
+import type {
+    MemoryEntryStatus,
+    MemorySnapshotRecord
+} from '../../src/contracts/memory'
+
+const memoryTypeLabels: Record<string, string> = {
+    identity: '身份',
+    preference: '偏好',
+    fact: '事实',
+    plan: '计划',
+    context: '上下文',
+    other: '其它'
+}
+
+const memoryTagTypes: Record<
+    string,
+    'success' | 'warning' | 'danger' | 'info' | ''
+> = {
+    identity: '',
+    preference: 'success',
+    fact: 'info',
+    plan: 'warning',
+    context: 'danger',
+    other: 'info'
+}
+
+const jobKindLabels: Record<string, string> = {
+    recall: '记忆召回',
+    extract: '记忆提取',
+    dream: 'Dream 整理',
+    clear: '数据清理'
+}
+
+const jobStatusLabels: Record<string, string> = {
+    pending: '排队中',
+    running: '运行中',
+    completed: '已完成',
+    partial: '部分完成',
+    failed: '已失败'
+}
+
+const jobStatusTagTypes: Record<
+    string,
+    'success' | 'warning' | 'danger' | 'info'
+> = {
+    pending: 'info',
+    running: 'warning',
+    completed: 'success',
+    partial: 'warning',
+    failed: 'danger'
+}
+
+export const formatTime = (value: string | Date | null | undefined): string => {
+    if (!value) return ''
+    const date = new Date(value as string | number)
+    if (Number.isNaN(date.getTime())) return String(value)
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    const hour = String(date.getHours()).padStart(2, '0')
+    const minute = String(date.getMinutes()).padStart(2, '0')
+    return `${year}-${month}-${day} ${hour}:${minute}`
+}
+
+export const toErrorMessage = (error: unknown): string => {
+    return error instanceof Error ? error.message : String(error)
+}
+
+export const formatImportance = (value: number | null | undefined): string => {
+    if (value == null) return ''
+    return Number.isFinite(value) ? value.toFixed(2) : ''
+}
+
+export const getMemoryTypeLabel = (type: string): string => {
+    return memoryTypeLabels[type] ?? type
+}
+
+export const getMemoryTagType = (
+    type: string
+): 'success' | 'warning' | 'danger' | 'info' | '' => {
+    return memoryTagTypes[type] ?? 'info'
+}
+
+export const getMemoryStatusLabel = (status: MemoryEntryStatus): string => {
+    return status === 'archived' ? '归档' : '活跃'
+}
+
+export const clampImportance = (
+    value: number | null | undefined
+): number | null => {
+    if (value == null || !Number.isFinite(value)) {
+        return null
+    }
+
+    return Math.min(1, Math.max(0, value))
+}
+
+export const getImportanceTone = (
+    value: number | null | undefined
+): 'high' | 'medium' | 'low' | 'empty' => {
+    const normalized = clampImportance(value)
+    if (normalized == null) return 'empty'
+    if (normalized >= 0.7) return 'high'
+    if (normalized >= 0.4) return 'medium'
+    return 'low'
+}
+
+export const formatImportancePercent = (
+    value: number | null | undefined
+): string => {
+    const normalized = clampImportance(value)
+    return normalized == null ? '0%' : `${Math.round(normalized * 100)}%`
+}
+
+export const getJobKindLabel = (kind: string): string => {
+    return jobKindLabels[kind] ?? kind
+}
+
+export const getJobStatusLabel = (status: string): string => {
+    return jobStatusLabels[status] ?? status
+}
+
+export const getJobStatusTagType = (
+    status: string
+): 'success' | 'warning' | 'danger' | 'info' => {
+    return jobStatusTagTypes[status] ?? 'info'
+}
+
+export const snapshotHitCount = (snapshot: MemorySnapshotRecord): number => {
+    return snapshot.items.reduce(
+        (total, item) => total + item.matchedMemories.length,
+        0
+    )
+}
+
+export const formatSearchTexts = (
+    value: readonly string[] | null | undefined
+): string => {
+    return value == null || value.length === 0 ? '-' : value.join('、')
+}

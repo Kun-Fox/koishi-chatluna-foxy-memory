@@ -1,0 +1,416 @@
+# CHANGELOG
+
+## 2026-11-01 version:0.31.2
+
+- pending: 更新 package.json 与 package-lock.json 至 0.31.2；修复工具配置 schema 类型、恢复宿主错误事件所需的异步回调，补齐画像服务生命周期测试桩，并统一累计变更的代码格式。
+- 6a01794: 调整 README 中 Character 记忆注入示例的标题。
+- 70bce67: ChatLuna 与 Character 共用画像和快照文本组装，统一使用 `## 用户画像` 与 `## 短期记忆` 标题，移除 Character 快照的单引号包裹及重复格式化逻辑。
+- 70bce67: 将 ChatLuna 主插件的用户画像与记忆快照合并为上下文尾部的一条消息注入，统一注入缓存与管线，移除重复格式化函数并复用正文与服务引用，保留独立开关，改善画像变化时的前缀缓存复用（#11）。
+- 8274e1f: 将 enableMemoryTools 总开关替换为 enabledMemoryTools 多选配置，选项统一显示中文工具名称与用途，按所选项目向 ChatLuna 注册七种记忆工具，默认选中查询记忆、查看记忆来源和创建记忆；同步配置样例与文档。
+- e1db4b8: 合并画像处理结果计数分支，精简消息用户去重与已有画像映射，修正保持原样日志的预设上下文。
+- e1db4b8: 精简画像流程的重复用户查询、无消费的跳过原因字段、可选取消信号判断及顺序去重实现；Dream 完成通知只传触发模式与涉及用户，统一涉及用户命名，服务停止时同时取消 Dream 与画像任务。
+- e1db4b8: 人物画像独立管理模型加载、记忆读取、队列与取消；Dream 和提取完成仅触发画像，开启提取后整理时等待整理结束读取最新记忆，关闭整理时直接触发，清理 Dream 内画像执行和统计逻辑。
+- e1db4b8: WebUI 用户画像卡片增加单人重新生成入口，复用独立画像生成流程与其同预设队列，跳过已审阅判断并返回处理结果，同步 RPC 契约与文档。
+- 04eb004: 新增默认开启的 Dream 流程画像更新开关 enableDreamUserProfileGeneration，enableUserProfileInjection 仅控制聊天画像注入；同步工作流文档与现有测试配置。
+- 04eb004: 配置、日志、WebUI 与当前文档统一使用 Dream 流程称呼，更新 README 中画像更新开关的说明。
+
+## 2026-11-01 version:0.31.1
+
+- 5f05bab: 更新 package.json 与 package-lock.json 至 0.31.1，修正发布前 lint 发现的代码格式问题。
+- b54bc2c: 提取后 Dream 由服务统一读取新记忆并收集画像关联用户，分组函数复用读取结果，移除画像专用读取分支和分组返回的用户字段。
+- b54bc2c: 增加默认开启的提取后自动整理开关及独立的提取后画像更新开关；自动画像更新与注入分离，手动 Dream 沿用原画像开关，仅开启画像生成时直接处理新记忆关联用户（#10）。统一提取后 Dream 整理的任务模式、队列、分组文件、日志与文档命名。
+
+## 2026-10-29 version:0.31.0
+
+- 02b8b11: 更新 package.json 与 package-lock.json 至 0.31.0。
+- 741f5cf: 集中验收修正累计代码格式，调整召回串行工具纠正测试以检查实际模型输入消息。
+- eab13ce: 接通旧快照读取、按行编辑保存与 pass 结束流程，启用快照维护提示词；每次执行一个工具，参数错误支持纠正，保存失败进入任务失败处理。清理旧整段文本生成、NO_MEMORY、闲置返回字段及冗余检索记录转换，同步现有测试和工作流文档。
+- 923a574: 定义快照维护提示词，输入带行号的旧快照，说明按需检索、编辑或跳过及容量约束。
+- 2445c41: 添加快照最大行数配置，默认 5 行、范围 5～50 行；快照编辑工具限制每行 100 字符，并在保存前校验最终快照。
+- 2348fe9: 日志会话优先显示平台群聊或私聊 ID，补齐召回、提取及模型调用的作用域传递，预设解析失败日志使用当前消息来源。
+- cad8c41: 人物画像结果工具改用顶层 action、content、reason，移除 decision 嵌套及联合类型；更新正文必填条件移入业务校验，沿用纠正重试。
+- 534b687: 集中提取、人物画像和人设卡片结果工具定义，统一工具描述与参数说明；人设卡片删行统一从 0 开始，同步调用方、提示词、测试与文档。
+- cfc277b: 添加召回 pass 与快照按行编辑工具，使用从 0 开始的原行号进行追加、修改、删除，提供保存成功结束信号及工具创建入口。
+
+## 2026-10-28 version:0.30.1
+
+- 205c1d6: 更新 package.json 与 package-lock.json 至 0.30.1，修正 Character 消息采集接入处的会话 ID 类型声明。
+- 53811ba: 合并提取初始化与调度入口，集中功能和白名单判断，清理 Character 重复注册与旁听判断。
+- a1e6793: Character 从启动后的首条合规普通消息建立消息池与旁听计数，达到阈值异步提取；回填去重保留实时消息边界，平台入账与 after-chat 共用游标和运行锁。ChatLuna 消息池收拢为实际请求与回复，清理渠道广播及旧计数接口（#8）。
+
+## 2026-10-28 version:0.30.0
+
+- d2df172: 更新 package.json 与 package-lock.json 至 0.30.0；明确增量任务后台 Promise 调度，修正向量测试 SQL 中已退役的固化列值。
+- 778d84a: 更新增量 Dream、提取、日志、向量索引与 WebUI 文档及文件索引。
+- a8af6d9: Dream 统一呈现组内记忆字段并简化任务提示，提取提示词明确每条记忆描述独立主题、概念或事件。
+- 1cab61f: 自动提取后提交内存队列，同预设全量与增量串行执行；逐组刷新成员、隔离工具范围并记录覆盖，单条组跳过整理但保留种子用户画像更新。提取索引同步失败返回已保存记录及警告，消息游标正常推进。
+- be12a2e: 新记忆独立检索语义近邻，在候选截断前排除同次提取的全部 ID，沿用结果上限、相似度阈值、重排序与失败回退。
+- c6e2124: 移除旧固化状态、写入参数及索引过滤，主库迁移退役字段与关联索引，向量 schema 和预设导出格式升至 v5，保留历史导入支持。
+
+## 2026-10-27 version:0.29.1
+
+- 4a9c03a: 更新 package.json 与 package-lock.json 至 0.29.1。
+- 177c561: Dream 按模型最大上下文至少 200k 判断可用性，移除输出预算扣减与默认 4096 输出限制，沿用宿主输出配置。
+- c8beba1: Dream 近邻索引支持 2001～4000 维 halfvec HNSW，同步半精度候选查询与索引就绪检测，保留原始向量存储和构图重评分精度。
+
+## 2026-10-27 version:0.29.0
+
+- af81283: 更新 package.json 与 package-lock.json 至 0.29.0；明确日志上下文字段类型，修正已有测试的旧日志及恢复行为预期，统一累计变更排版。
+- 30bb4e7: 修复画像编辑弹窗窄屏按钮样式泄漏，使用 :deep() 保留容器作用域（#9）。
+- 8f2c7a7: 统一剩余中文日志、秒制耗时和异常换行；收窄模型与业务异常边界，人设读取及保存失败直接传播，移除索引打开异常触发的自动恢复。
+- d463e54: 统一日志内容块与输出入口，提前跳过关闭功能的专属处理，清理重复日志和闲置状态。
+- 2a49f22: 整理召回与提取结果日志，始终展示召回快照，补齐搜索空结果说明，精简重复模型响应。
+- 3b7ec42: 统一模型调用、响应、召回及提取等待日志的中文展示。
+- aee2ac3: Character 本轮画像与召回共用冻结的历史及当前消息，两次模板渲染复用注入内容，清理跨轮参与者缓存。
+- cd43203: 精简 Dream 准备阶段日志，展示向量模型、维度、分组与优化结果，统一日志规范。
+- 1027db4: 统一客户端共享契约、RPC 和记忆字段引用，收拢类型扩展，移除重复类型及提示词转发入口。
+- a33559d: Dream 候选查询交由数据库选择 HNSW 或精确扫描，移除逐查询执行计划解析。
+- 2c062ae: 移除跨组优化的重复目标审计与最佳副本，保留正收益判断、容量约束和最终分组检查。
+- 3603cd7: 移除语义分组固定时间预算，保留取消、迭代与边访问上限。
+- 1a4d7ae: 精简候选处理、伙伴提示与优化控制，移除未使用的候选相似度字段。
+- 74c14e5: 清理旧查询接口和无用声明，统一提取、检索、向量快照与 Dream 的职责命名。
+- 4206412: 统一运行日志上下文与失败记录，精简 Worker 入口和画像异常处理。
+- 9d5d078: 精简记忆工作流条件、重复校验和内部兜底，补齐 Dream 模型、工具、批次与画像诊断。
+- 09b9172: 将近邻候选和跨组优化作为 Dream 默认行为，移除开关并统一当前流程文档。
+- 647ecfe: 删除关键词分区及 HDBSCAN 旧实现，统一语义分组 Worker 协议与生命周期测试。
+- cc9f166: 接入 Dream 近邻候选、冻结向量 CSR 图与跨组移动、交换优化，补充分组覆盖与容量验证。
+- a50bac8: 升级 PGlite 与 pgvector，增加扩展备份升级、启动对账后的 HNSW 维护和 Dream 近邻查询。
+- 5666f06: Dream 接入容量约束球面二分，以已有向量形成每批最多 30 条的完整分组，支持 Worker 取消和数组转移。
+
+## 2026-10-21 version:0.28.0
+
+- 734123e: 更新 package.json 与 package-lock.json 至 0.28.0，归并本版本变更记录，并修正累计变更中的测试排版。
+- ece6eb3: 精简记忆更新与固化的重复查询，拆分结果在事务内批量写入；合并与拆分共用索引同步，Dream 请求副本在响应入列时构造，跳过批次数由记录派生。
+- e35410b: Dream 工具范围收敛为更新、合并、拆分、归档与检查五项，统一上下文中已知记忆 ID 的使用说明，同步提示词与会话测试。
+- c7936ac: 精简 README，集中说明功能、安装配置与使用入口。
+- 618de21: 精简开发规范，拆分记忆工作流、Dream、向量索引与模型记忆视图文档，按修改范围关联维护要求。
+- 2e0174d: 新增公共记忆拆分工具，将一条活跃记忆原子拆为至少两条，继承来源并归档原记忆；接入主对话与 Dream，Dream 拆分结果直接固化，新 ID 可继续操作。
+- 659164e: 统一提取、召回、Dream、用户画像、人设卡片与历史摘要提示词的角色段开头。
+- a4e6f6d: 明确人设卡片读取与生成、索引重建阶段、记忆检索及 Dream 提示词函数的命名，同步调用方、Worker 协议与测试。
+- a72d04e: 统一模型记忆字段格式与有序清单，Dream、搜索、Recall 和用户画像共用渲染入口；集中解析 speaker 标签，可空元数据缺失时省略整行，保留重要性 0 与空关联。
+- 68d331f: 精简 Dream 会话接口与聚类结果，固定目标集合独立于批次初始化，模型请求沿用配置参数，设计文档收敛为当前执行规则。
+- 6308c48: 补充 Dream 真实会话与上下文压缩验收记录，记录请求用量、压缩行为及缓存观察结果。
+- 19ed5fb: 固定 200k 压缩阈值依据供应商上报的单次输入量判断；压缩后重置用量基线，完整保留当前批次字段和交互。
+- 8d3d07f: 全量 Dream 改为持续工具会话，按处理覆盖自动换批，同轮工具串行执行，每批最多 60 轮、连续 3 轮无有效操作后跳过；新增部分完成状态、上下文压缩与取消排空，替换旧全量和增量执行链，移除自动 Dream 触发配置。
+- 8810ef9: 增加 Dream 固定目标、可访问与已处理集合；公共工具成功写入后登记进度，更新与合并随事实固化，索引同步失败保留已提交结果和警告。
+- 0076f0c: 整理 Dream 工作流目录，统一公共记忆工具创建入口，由主对话、Recall 与 Dream 分别选择暴露范围并提供上下文。
+- 44047e1: 新增批量记忆检查工具 living_memory_checked_memory，要求填写无需变更的理由，由调用方执行检查处理并登记结果。
+- a2ea469: 新增公共记忆合并工具，将至少两条不同的活跃记忆合成一条新记忆，原子创建新 ID、汇集来源、归档来源并更新关联索引。
+
+## 2026-10-17 version:0.27.3
+
+- 4f2991f: 统一前端样式为独立 CSS 引用，将召回测试和滚动条的内嵌样式移出 Vue，拆分主题变量、Element Plus 公共控件与弹窗样式及主页面布局；保留组件 scoped 和浮层全局规则，同步开发规范。
+
+- e418708: WebUI 清空预设数据改用独立确认弹窗，分区展示不可恢复提示、目标预设、清空范围和确认语句，适配明暗主题与窄屏；移除重复提示文案，底部操作区与主体背景一致，“取消”和“确认”按钮之间保留明确间距；输入完整语句逐字匹配后才启用确认按钮，每次打开重置输入，清空目标固定为弹窗打开时的预设。
+
+## 2026-10-16 version:0.27.2
+
+- 7a538de: 提取结果新增必填 reason，说明提取记忆或没有可记录内容的原因，并记录到诊断日志；保留原有 memories 数组及空数组处理流程，同步结果工具与既有测试。
+
+- b186514: 核查并精简消息转写链路：删除实时采集的无用正文序列化、重复引用过滤、回填时间单位和类型猜测、Character 按昵称猜测 bot 身份、ChatLuna 内容转换中的不可达类型分支及冗余返回字段；原始正文仅保存在消息字段，移除重复 WeakMap 缓存、未使用类型和参数及重复检查。回填直接使用 Satori 毫秒时间戳，缺失作者 ID 时不再伪造用户 0；自有日志读取不再剥离正文中的“昵称说：”。
+
+- b186514: 引用统一显示为 `[回复 "昵称：正文"]`，用空格连接本次回复，不再主动插入换行，移除空引用的特殊占位分支。消息转写只在每条消息首行添加时间和说话人，保留正文自身的换行，避免向嵌套引用插入外层说话人标签；同步来源消息正文的多行格式。
+
+- 5b22c33: 修复实时采集与历史回填遗漏独立 quote 的问题，统一转写引用作者、正文及其中的消息元素；内联引用不再只显示占位，作者仅取用户昵称或 ID。补齐标准 emoji、sharp 与 template 元素的转写。
+
+- 313ca8d: 统一消息转写与新记录的来源消息格式，将“昵称说：正文”改为“昵称：正文”，去掉说话人标签后附加的“说”字。
+
+- 966f9e3: 精简删除记忆工具的 memoryId 参数描述为“要删除的记忆 ID”，统一模型可见的参数说明。
+
+- 23f9457: Character 召回的当前消息与历史统一从本插件维护的会话日志读取，经 toLogTranscriptMessages 转换；Character 仅提供触发时机与目标消息 ID，不再读取其 focusMessage.content。首次注册会话时复用平台采集逻辑补写原始 session 消息，@ 与其他元素沿用已有日志渲染，移除 Character 当前消息的独立转写路径。按目标 ID 划定历史边界，目标缺失时跳过召回，不误用其他消息。调整既有用例验证平台正文与 Character 转写正文不同时采用平台正文。
+- 23f9457: 清理召回链路的未使用事件字段、重复类型和过时注释，合并日志读取的重复分支，@ 查询在途状态改用 Set；私聊来源昵称仅在实际解析提取来源时查询，群聊不再执行无用查询。修正 Character 消息 ID 不同却按相同正文误判为同一消息的问题，以及历史数量为 0 时返回全部日志的问题。修正删除记忆工具参数声明的既有格式问题。
+
+## 2026-10-13 version:0.27.1
+
+- 544b0c3: 精简五个主对话记忆工具的描述，工具描述集中说明用途与调用时机，字段填写规则集中在参数 schema；将相对时间转换和变化状态注明日期的规则移入共享 generatedMemorySchema，供创建、更新、提取与 Dream 整理共用。
+- 41838ce: 精简 README 的模型工具说明，移除返回字段、失败结果及索引同步警告的接口细节，保留用途、参数和实际行为，并明确来源消息工具只查看活跃记忆。
+- 544b0c3: 统一来源消息获取、更新和删除工具的目标记忆校验与错误提示，只允许访问当前预设的活跃记忆；目标不存在、已归档或属于其他预设时统一报错，错误提示包含目标 ID，并要求重新查明记忆 ID 后再调用，不向模型区分不可访问原因。来源消息查询不再返回归档记忆，来源消息工具与更新工具统一使用严格 null 判断，删除工具不再仅返回 deleted=false；保留写入成功但索引同步延迟时的警告，同步既有来源消息工具用例。
+
+## 2026-10-11 version:0.27.0
+
+- aa711fb: 记忆工具通过注册元数据由 ChatLuna 在组装子 agent 工具列表时排除，移除共享预设解析入口新增的子 agent 调用拦截，恢复真实会话作用域解析的原有校验；配置与 README 明确默认可见性以及宿主权限配置可覆盖的边界。
+- 8b2687e: 新增按预设更新活跃记忆的应用接口，在预设串行队列内校验记忆归属与状态，复用事务、speaker 关联和向量索引同步，供记忆更新工具调用。
+- cb56505: 五个对话记忆工具仅允许主 agent 使用，统一注册元数据关闭子 agent 可见性，并将现有子代理拒绝检查收敛到共享预设解析入口，覆盖检索、来源消息、创建、更新和归档调用；同步配置描述与 README。
+- cb56505: 移除独立的 `LivingMemorySearchToolInput` 类型别名，搜索工具、召回和既有测试统一直接从 `memorySearchTool.schema` 推导参数类型。
+- cb56505: 按 ChatLuna 已移除工具参数自动修复的前提，简化记忆检索参数 schema，使用 Zod 原生数组、去除首尾空白与长度校验，移除字符串化数组拦截正则及规则包装。参数错误继续通过现有工具校验返回失败原因，由模型纠正后重新调用。
+- cb56505: 将五个记忆工具的名称、描述和参数 schema 统一收敛到 `src/service/prompts/memory_tools.ts`，按工具组织定义对象，移除分散的 contract 文件与实现文件内描述。工具实现、召回和平台注册共用定义，注册入口统一装配与注销。
+- cb56505: 统一主对话与召回的 `living_memory_search`，固定只检索活跃记忆，移除模型侧状态参数、双份工具定义及构造开关，输入类型直接从 schema 推导；归档记忆保留供人工查看。同步既有工具用例、README 与 AGENTS 约束。
+
+- cb56505: 新增 `living_memory_update_memory` 与 `living_memory_delete_memory` 工具，分别完整更新当前预设的活跃记忆和执行归档；更新在预设级队列内校验目标归属与状态，复用现有事务、speaker 关联和索引同步，索引同步失败时如实返回事实已保存。以默认关闭的 `enableMemoryTools` 统一控制五个记忆工具是否供 ChatLuna 主对话使用，移除 `enableMemoryCreationTool`，保留单次创建数量配置；同步工具文档与配置测试夹具。后台召回与 Dream 流程不变。
+
+## 2026-10-11 version:0.26.3
+
+- fcba6ed: 修复 Dream 更新与合并记忆时，将已在当前预设注册但未关联原记忆的用户误判为非法 speakerLabels 的问题。移除用户必须属于操作前记忆关联集合的限制，允许按记忆内容补齐遗漏关联；保留预设昵称映射校验、未知昵称纠错重试与记忆覆盖校验，全量和增量 Dream 共用此修复。同步调整既有未知用户校验用例。
+
+- 3fbd69d: 精简测试套件，用例由 413 个减至 372 个，测试代码由约 1.56 万行减至约 1.40 万行，不涉及源码。修复 3 个不起作用的用例：召回并发锁用例此前被间隔检查提前拦下、走不到锁，现让日志前进到满足间隔后再触发第二次请求；提取窗口为 0 与清空会话两个用例在 `queue` 返回后立即断言「未提取」，而排干在返回之后才调用提取器，断言恒成立，现改为让出后再断言，另两个用例末尾的同类断言一并修正。新增召回失败后清除锚点并立即重试的用例，以及全量 Dream 中失败单元不推进固化的断言。删除 `vector-index-benchmark`、`job-tracker`、`transcript-origin-context` 三个测试文件（分别测的是开发脚本、内存替身上的状态流转与两条字符串模板）。删除重复、恒真、过时与只断言日志文本的用例，其中 HDBSCAN 进度回调的 3 个用例对应的回调在生产代码中没有调用方。其余用例去掉对提示词与工具描述措辞、日志文本、第三方库报错文案、SQL 文本及内部调用顺序的断言，保留对行为的断言；`prompt-contracts` 只保留 schema 校验、字段说明不在提示词正文重复，以及动态文本转义三类。
+
+## 2026-10-07 version:0.26.2
+
+- ca80a30: 修正 AGENTS.md §8 关于 embedding 失效条件的表述。原文称「记忆正文、摘要或关键词变化时必须使旧 embedding 失效」，与实现不符：向量只由 `content` 生成（`embedding.ts`），`memory_mutation_service.ts` 仅在 `contentChanged` 时以 `replace` 重新生成向量，摘要、关键词与状态变化均以 `preserve` 保留向量；摘要不进入索引，关键词由每次索引同步时重写 `lm_index_keywords` 维护。现改为「embedding 只由正文生成：正文变化时必须重新生成，其余字段变化（含状态）保留向量；任何字段变化都须同步索引文档，关键词索引随之重写」。
+- e000421: 删除快照缓存中只写不读的内存层。`LivingMemorySnapshotCache` 的 `snapshotVariableByScope` 由 `hydrate` 无条件写入，读侧在 a4c6406 随 ChatLuna 函数 provider `living_memory` 与 `renderSnapshot` 一并删除——函数 provider 命中已赋值的变量即返回、属死代码，而缓存本身由此失去唯一读点，此后每次 `hydrate` 都覆盖同一键并回源数据库，`clearByScope`/`clearByPreset`/`clearByConversation` 六处调用全部空转。现删除该缓存类与全部清除调用，改用无状态渲染函数 `renderSnapshotText`（`src/service/memory/snapshot/snapshot_text.ts`）：`prompt_hydration.ts` 直接经 `SnapshotRepository.getLatestSnapshotByScope` 读取并渲染，会话清理、预设清理、导入、归档、删除快照等路径不再需要记忆化失效；`LivingMemoryRecallCoordinator` 去掉 `snapshotCache` 构造参数，`recall.snapshot.updated` 日志内容改由刚写入的快照项渲染，不再回读数据库；`LivingMemoryDreamJobRunner` 去掉快照缓存参数与 `hasMemoryChanges` 判定（原为「Dream 改动记忆后清缓存」，缓存已不存在）。同步删除 `tests/dream-workflows.spec.ts` 中 11 处 `clearByPreset` 桩与两个仅验证清缓存行为的用例、`tests/recall-coordinator.spec.ts` 的 `hydrate` 桩；快照内容日志用例改为断言写入项经渲染后的文本，原「快照水合失败写失败任务」用例改为「快照写入失败写失败任务」。AGENTS.md §2 改述注入读取最新快照，§8 删除清缓存约束并写明不设内存缓存及原因。
+- 878985e: 召回失败时清除该会话的召回锚点。锚点在召回启动时即前移到当前日志末尾，此前失败（子模型调用出错、内部检索抛错、快照写入失败）后不回退，需再累计满 `recallIntervalMessages` 条消息才会重新召回，期间一直注入旧快照，会话首次召回失败时则整段间隔没有快照。现 `LivingMemoryRecallCoordinator` 在失败时删除锚点，下次触发按首次触发立即重试；召回运行期间该会话持锁，锚点不会被其他路径写入，删除不与 `clearAll`/`clearByConversation` 冲突。`<NO_MEMORY>` 属于召回成功，仍按间隔计数。AGENTS.md §4 同步写明失败时清除锚点。
+
+## 2026-10-07 version:0.26.1
+
+- 596ef62: 精简 README、配置项描述与 WebUI 指南的措辞，并按代码修正已过时的内容。README 的模型表把 `mainModel`、`embeddingModel` 的「启用自动提取或 Dream 时必需」「记忆召回和 Dream 均必需」统一为「必需」，`rerankModel` 只写「可选」，不再在该列说明未配置或失败的后果；召回一节只描述用户可感知的行为，删除候选倍数、逐短语取最大分等实现细节，以及 0.26.0 移除召回策略、首次升级补齐向量索引来源字段这两段升级说明（已记录在 CHANGELOG）。「记忆查询工具」一节按现行实现重写：`living_memory_search` 的模型参数是 `memoryStatus`，没有 `memoryTypes`，返回字段为 id、类别、更新时间、情绪色彩、来源会话与正文；`living_memory_get_messages` 每次只查看一条记忆，没有批量上限与 `notFoundMemoryIds`；`living_memory_create_memory` 的记忆字段补上 `speakerLabels`。`src/index.ts` 的配置描述删除「（必需）」标注、未配置或失败时的后果说明，以及与相邻配置项重复的内容；`enableSnapshotInjection` 不再在描述中说明 Character 注入方式。README、`debug` 配置描述与 AGENTS.md §11 删除「仅应在访问受控的环境启用」与凭证掩码的说明：Koishi 控制台与日志只有实例拥有者可见，该提示没有对象。`docs/WEBUI_GUIDE.md` 按现有实现更新文件清单（实际包含 `client/tsconfig.json`、`env.d.ts` 及组件目录）、入口路径解析（开发入口取真实路径，生产入口固定为 `node_modules` 路径）、客户端入口与 RPC 事件类型的两侧声明方式。
+- 13ccdfd: 修正 README 中「自动增量 Dream 不生成用户画像」的错误描述。增量 Dream 自 8352be7 起会在批次结束后为本批涉及的用户重新生成画像（同样受 `enableUserProfileInjection` 控制），README 的旧表述未随之更新，596ef62 精简措辞时沿用了该错误。
+- 01e05af: 重写 AGENTS.md，设计约束只保留不变量、禁止项与必要原因。装包算法、占位渲染、卡片生成流程等实现细节删去（代码注释已有记载），并去掉为约束辩护或交代来历的句子；行文按语义断行，不再按固定列宽手工折行。修正三处与代码不符的表述：§7 称 `living_memory_search` 只查询活跃记忆，与 §9 及实现矛盾（主对话工具由模型以必填 `memoryStatus` 选择范围，仅召回内部实例固定查活跃），现删去该句，以 §9 为准；§5「提取必须取得对应预设提示词」已被人设卡片取代，并入 §7 人设卡片一条；§6 补明全量与增量 Dream 都会生成画像。§10 的人设卡片只读接口并入 §7，消除重复。验证要求为服务端源码变更补上 `yarn test`，WSL 说明改为整体说明：在 WSL 环境下无法执行完整测试，需要 Windows 环境执行。
+
+## 2026-10-07 version:0.26.0
+
+- b67854b: `LivingMemoryEmbeddingSearchEngine` 接入 Reranker，此前 Reranker 只服务 `embedding-rerank` 召回，agentic recall 内部检索与主对话 `living_memory_search` 均不重排。配置 `rerankModel` 后混合检索按 `memorySearchToolMaxResults` 的 3 倍取候选，每条查询短语各自重排一次，候选取各次最大分（与混合检索多向量取最大的口径一致）后截取；重排失败记 `search.rerank.failed` 并回退混合检索排序，不阻断检索。召回内部检索、主对话工具与 WebUI 检索测试共用该路径；`LivingMemorySearchDetailedResult` 新增 `rerankScore`（未重排为 null），检索测试页展示该分数；`rerankModel` 配置说明随之更新。新增逐短语重排取最大与重排失败回退两类测试。
+- b0786d2: 移除 `embedding-rerank` 召回策略，召回统一为 Agentic Recall。此前两种策略共存却不对称：rerank 只做单向量 KNN、不用关键词、不设相似度门槛，只要预设有活跃记忆就几乎必然写满 topK 覆盖快照，「无可靠结果保留旧快照」基本失效；改写关闭（默认）时只用当前一句做查询，指代与短句几乎召回不到；`recallTopK` 只对 rerank 生效，`memorySearchMinSimilarity` 只对工具生效，配置对应关系不直观。现协调器删除策略分派，只保留 agentic 路径：`subModel` 未配置时入队即跳过（记 `recall.skipped reason=model-not-configured` 诊断、不写任务，与 `mainModel` 缺失时跳过提取一致；旧默认策略不依赖 `subModel`，未配置的用户升级后若逐次失败会堆积同质失败任务），执行器内的同名检查随之删除；空消息直接跳过，历史加载失败仍以空历史继续，`<NO_MEMORY>` 保留既有快照，失败写入 failed job。删除 `retriever.ts`、`query_builder.ts`、`prompts/recall_query.ts`、`RetrievedMemoryItem` 及配置项 `recallStrategy`、`enableRecallQueryRewrite`、`recallTopK`。`subModel` 说明标注为必需，默认值仍为 `'无'`（ChatLuna 模型下拉固定含「无」，`required()` 只能拦截缺键的旧配置并使插件无法启动，故不采用）；配置状态改为无条件检查：`subModel` 未配置告警新码 `recall-model-missing`（提示召回将被跳过），`embeddingModel` 未配置告警 `embedding-model-missing`，删除 `recall-rewrite-model-missing` 与 `agentic-recall-model-missing`。`embeddingModel` 与检索结果上限、相似度阈值的配置说明注明召回内部检索与对话工具共用。快照与任务的策略字段暂保留，协调器固定写入 `agentic-recall`，由后续提交移除。同步 README 与 AGENTS.md §4/§9；重写召回协调器测试（新增空消息与 `subModel` 未配置跳过用例），删除检索引擎测试中的 retriever 用例与查询改写测试。
+- 6687305: 契约与持久化移除召回策略字段与记忆引用快照。契约删除 `MemoryRecallStrategy`、`MemoryReference`、`MemorySnapshotItem` 联合与 `MemorySnapshotResolved*`，快照项只剩 `AgenticMemorySnapshotItem`；`MemorySnapshotRecord.strategy`、`MemoryJobRecord.recallStrategy` 及两张表的对应字段删除，`createJob`/`createFailedJob`/`upsertSnapshot` 去掉策略参数，`listSnapshots` RPC 直接返回 `MemorySnapshotRecord` 分页。新增一次性迁移 `legacy-reference-snapshot-cleanup-v1`，启动时按快照项形状删除旧策略留下的记忆引用快照，由后续召回重建；数据库中残留的 `strategy`/`recallStrategy` 列由 SQLite 驱动原样保留且不参与读写。快照缓存删除记忆引用渲染分支及其 `getEntriesByIds` 依赖，随之删除无调用方的 `formatDateOnly`、`snapshot_items.ts`、`listResolvedMemorySnapshots` 与仓储 `getEntriesByIds`。WebUI 删除任务页策略列、快照页策略列与快照详情中的引用分支，客户端随之删除无调用方的 `formatScore`、`formatJobRecallStrategy` 与快照项判别、状态标签辅助函数。README 补充升级后首次启动删除旧快照的说明。新增旧快照迁移只执行一次的回归。
+- 666350c: 删除向量索引的纯语义检索 `searchSemantic`。它唯一的生产调用方是已移除的 `embedding-rerank` 检索器，现在所有记忆检索都经 `searchHybrid`。`MemoryVectorSearch` 契约只保留 `searchHybrid`；`MemorySemanticSearchInput` 与 `MemoryVectorSearchHit` 两个只为继承存在的父类型并入 `MemoryHybridSearchInput` 与 `MemoryHybridSearchHit`；只剩单一调用方的 `prepareSearchVectors` 内联进 `searchHybrid`。Worker 的 `queryKnn` 仍服务混合检索与 Dream 邻居查询，予以保留。向量索引服务测试中的语义检索断言改走无关键词、阈值为 0 的混合检索，覆盖同一条 KNN 与类型过滤路径。
+- a6879bf: 修复召回统一后的三处测试问题。服务生命周期测试的仓储桩补上新增的 `removeLegacyReferenceSnapshots`，此前 `start()` 因调用不存在的方法而抛错。召回协调器测试辅助函数的执行器桩把 `runLogger` 参数从默认值改为显式非空类型标注：执行器 `run` 的该参数可选，桩的上下文推断类型含 `undefined`，加默认值会被 oxlint 判为无效默认值，去掉默认值又不满足内部 `run` 的非空参数；协调器始终传入 run 级 logger，显式标注与实际调用一致。历史加载失败用例的日志断言原为 `some(不含错误详情)`，旧实现下恒真、不验证任何内容；重写时改成 `every` 后与 `recall.history.unavailable` 诊断记录 `summarizeError` 的现行为冲突。诊断日志按 AGENTS §11 只用于访问受控环境，记录错误详情属预期，故断言改为验证该诊断事件确有记录。
+
+## 2026-10-06 version:0.25.1
+
+- 7967315: 改造用户画像的结果契约，去掉 `content: null` 空结果通道，让画像决策可以观测。此前结果工具的 `content` 可以为 null，表示「无需更新」，且禁止模型解释。这带来两个问题：一是日志只能看到 `content: null`，无法判断模型是否真的审阅了记忆；二是尚无画像时也能交 null，该用户因此一直没有画像，因为提示词只针对已有画像说明了 null 的用法，schema 与代码不区分这两种情况。现结果改为 `decision` 判别联合：`update` 提交完整新画像，附 `content` 与 `reason`；`keep` 保留已有画像，附 `reason`。两者都必须写理由。`validateResult` 拒绝尚无画像时的 `keep`，被拒结果和不合 schema 的 null 一样，走结构化输出既有的纠错重试，最多 3 次。`keep` 不写库，记一条 `user-profile.kept` 诊断；生成汇总中的 `empty` 计数改为 `kept`，`empty-content` 跳过分支随之删除（`requiredText` 已保证正文非空）。同步提示词 `output_contract`、结果工具描述与 AGENTS.md §7，改写画像测试的工具调用桩，并新增 keep 保留、无画像时 keep 被拒后重试、null 被拒后重试三类回归。
+- 6c17b7a: 修正模型对用户画像选择 `keep` 后，后续 Dream 对同一用户反复调用模型。`isProfileUpToDate` 判断画像是否需要重算时，比对的是画像行的 `sourceMemoryIds` 与 `updatedAt`，而这两个字段此前只在 `update` 改写画像时刷新。模型选 `keep` 后画像行仍停在上次改写时的输入，只要记忆集合与那时不同，此后每次 Dream 都会以完全相同的输入再询问一次，多半仍得到 `keep`，平白多出一次模型调用（手动 Dream 传入全部活跃说话人，浪费最多）。现 `keep` 分支经新增的 `markUserProfileReviewed` 单语句刷新这两个字段，正文不动，记下「这组输入已审阅、无需改写」，输入未变的后续 Dream 直接跳过。契约 `UserProfileRepository`、表级仓库与持久化门面同步新增该方法。WebUI 画像页的「更新于」与「由 N 条记忆生成」随之表示最近一次审阅的时刻与输入，不再特指最近一次改写。同步 AGENTS.md §7 与 `isProfileUpToDate` 注释；keep 用例改为断言记下本次输入，无画像时 keep 被拒的用例补充断言不触发审阅写入，Dream 工作流测试的仓储桩补齐新方法。
+
+## 2026-10-06 version:0.25.0
+
+- d53d7e3: 按 oxfmt 规则修正人设卡片相关代码的格式（`client/types.ts`、`preset_persona.ts`、`preset_personas.ts`、`persona_card.ts`），均为 45a48a0 与 a908dec 引入的折行偏差，无行为变更。
+- dd04ac2: 人设卡片删减不再归一换行符，保留部分与原文逐字节一致。此前 `splitLines` 先把 `\r\n`/`\r` 替换为 `\n` 再切行，删减分支以 `\n` 拼接，含 CRLF 的原文删减后换行被改写，与 AGENTS.md §7「保留部分为原字节拼接」不符（无删除分支返回原文则保留 CRLF，两条分支口径也不一）。现直接按 `\n` 切行，`\r` 留在所在行尾，拼接后与原文逐字节一致。ChatLuna 与 Character 预设经 js-yaml 加载，块标量中的 CRLF 在解析时已归一为 LF，实际只有双引号字符串中显式写入的 `\r` 会受影响。新增 CRLF 原文删减后逐字节保留的回归测试。
+- 23d2ed3: 收敛 Dream、增量 Dream 与用户画像的人设解析。三处此前各自复制一段私有 `resolvePersona`：可选注入 `PresetPersonaResolver`，未注入时回退预设原文。卡片服务在应用门面中无条件装配，可选参数只为测试便利，且卡片服务自身已实现失败回退原文，工作流层的回退是对同一契约的重复保护。现 `PresetPersonaResolver` 改为三者的必填构造依赖，删除三处私有方法，直接调用 `resolve(presetId)`，与提取协调器一致；用户画像服务的 `ctx` 仅为该回退所用，随之从构造参数中移除。契约注释删去「未装配时回退」的表述；测试改为传入解析桩，Dream 画像失败用例的故障注入随之移到解析桩上。
+- 50bfefd: 移除人设卡片只读视图的 `presetMissing` 提示，卡片服务不再依赖预设目录。该提示按「卡片 presetId 不在预设目录中」判定，而目录包含记忆、快照、任务、画像与 speaker 注册表中出现过的全部 presetId；卡片只在对话之后生成，对话必然写入 speaker 注册行，因此卡片存在时其预设必在目录中，提示在预设从配置删除后也不会亮起，形同死字段。此外 `catalog.list().catch(() => [])` 只兜住数据库故障，与同次读取的卡片列表口径重复。现删除契约 `PresetPersonaCardInfo.presetMissing`、客户端镜像类型、WebUI「预设不存在」徽标、卡片服务的 `PresetIdCatalog` 依赖与两处 catch；`isStale` 在预设已不可读时仍按新鲜处理，避免单张残留卡片使整个列表失败。同步 AGENTS.md §7，测试以「预设已不存在的手工卡片照常列出且不标过期」替换原预设缺失用例。
+- 79f8668: 人设卡片表移除 `createdAt` 字段，表级仓库写入改用单次 `upsert`。此前 `upsertPresetPersona` 先读行再分别 `create`/`set`，只为在覆盖时保留首次写入的 `createdAt`，而该字段无任何消费方（WebUI 只展示 `updatedAt`）；类注释称「单语句写入即原子」与实现不符；空 presetId 静默跳过、写入侧 trim 而读取侧不 trim，与服务层校验口径不一。现删除表定义、`PresetPersonaTableRecord`、契约 `PresetPersonaRecord`/`PresetPersonaCardInfo`、客户端镜像类型与 normalizer 中的 `createdAt`，写入改为 `ctx.database.upsert` 并去掉空 id 分支与 trim（调用方已保证），注释如实说明同一预设的写入由卡片服务串行。SQLite 驱动的字段默认可空，模型中移除的列在既有库中原样保留且不参与读写，无需迁移。
+- 597ef63: 移除人设卡片的启动预热。此前 `start()` 末尾等待为预设目录中的全部预设生成卡片（并发 3，每预设最多 3 次纠错重试），模型慢或不可达时拖住服务启动；预热无 dispose 检查，插件重载后仍可能继续发起模型请求与写库；目录中仅存在于记忆表的历史 presetId 每次启动都会读取失败；还会为尚无对话数据的预设生成卡片，此类预设删除后不在 WebUI 目录中，卡片无法经「清空预设数据」移除。卡片的首次生成本就发生在后台工作流中、不阻塞对话，现删除卡片服务 `warmup`、门面 `warmupPresetPersonas` 及 `start()` 中的调用，卡片只在提取、Dream 与用户画像首次取用时生成。
+- 8b2726c: 修正人设卡片「重新生成」在模型失败时丢失卡片并报告成功。此前 `resetCard` 先删除落库行再走一次解析，模型不可用、调用失败或结构化校验失败时结果回退原文且不落库、也不抛错，RPC 返回成功、WebUI 提示「卡片已重新生成」，刷新后卡片从列表消失，手工内容已丢失；预设已不存在时同样先删行再报错。现改为先读取预设原文并生成，确认生成成功后才在写队列内替换落库行（清空期间不写回），失败时抛出带原因（`model-unavailable`/`invoke-failed`/`structured-output-failed`）的错误交 WebUI 提示，落库行保持原状。删减结果的 `retryable` 标记随之改为 `failure` 原因字段。新增重新生成失败保留原卡片的回归测试。
+- f291562: 重构人设卡片的身份与状态模型，修正手工卡片被自动卡片遮蔽、清空后卡片残留与外部只读接口写库三类问题。此前卡片服务以「渲染文本哈希」为内存层唯一键，同时承载模型删减结果与手工卡片，extraction 经 `resolveRendered` 只读内存层、不读落库行：WebUI 手工保存后下一轮提取即在同一哈希键写入自动卡片，此后 Dream 与用户画像也命中该自动卡片，手工卡片对三个工作流全部失效直到重启；原文相同的两个预设还会经同一哈希键串卡。现卡片原文改取预设 system 部分的未渲染模板（ChatLuna 的 system 消息、Character 的 `system.rawString`），不经渲染器、不取变量值，也不再附加说明头；移除内存层与 `resolveRendered`，落库行成为卡片唯一状态，三个工作流统一经 `resolve(presetId)` 按主键读行、按原文哈希懒更新。提取协调器改为构造注入 `PresetPersonaResolver`（与 Dream、用户画像一致），`QueueExtractionOptions` 删除 `resolvePresetPrompt`，两个中间件不再渲染预设。生成结果改在按 presetId 串行的写队列内重读行后落库：生成期间被手工保存的卡片不再被覆盖；清空预设数据改经卡片服务删除卡片（含手工卡片）并推进清空纪元，清空前发起的生成不再写回，确认弹窗补充「人设卡片」。外部接口 `resolvePresetPersona` 改为真正只读：有卡片返回卡片，否则返回 system 原文，不调模型、不落库。同步 AGENTS.md §7/§10；preset-persona 测试改用有状态仓库桩，新增未渲染原文取文、预设变动后重新生成、手工卡片跨预设变动保持、保存后立即生效、同文预设不串卡、生成期间手工保存不被覆盖、清空删除手工卡片、清空期间生成不写回、只读接口不生成九类回归，并同步提取协调器、Dream 与用户画像测试的预设桩。
+- 2affd10: 修正人设卡片服务构造时拿到的预设目录为 `undefined`。此前应用门面构造卡片服务时传入的 `presetCatalog` 字段要到构造函数后段才赋值，卡片服务的 `listCards`/`getCard` 调用目录时直接抛 `TypeError`，WebUI「人设卡片」标签页无法加载，外部 `getPresetPersonaCard` 在卡片存在时同样失败；卡片生成与注入不受影响。现将预设目录的构造移到卡片服务之前。tsconfig 未开启 `strictPropertyInitialization`，类型检查不报告此类使用前未赋值。
+- 4ea947a: 补齐 `living_memory_preset_persona` 表的 Koishi `Tables` 声明合并。此前新增人设卡片表时只定义了表结构与 `PresetPersonaTableRecord`，未加入 `koishi-augmentations.ts`，minato 对 `extend`/`get`/`create`/`set`/`remove` 的表名约束（`K extends Keys<S>`）无法识别该表，类型检查失去对卡片持久化层的保护。无运行时行为变更。
+- 45a48a0: 新增预设人设卡片，记忆提取、Dream 整理与用户画像改为注入删减版人设。此前三类工作流向模型逐字注入完整预设原文，其中工具调用指南、输出与格式规范、状态模板、安保约束等操作性内容与人格无关，只会稀释任务指令、放大弱模型在满单元整理时的失败面。卡片由模型在编号行空间内选择应删的行号，保留部分按原字节拼接，模型无法重写正文；删除比例超过 80% 或剪出结果过短时回退原文并照常落库（`usedRawFallback` 标记，供 WebUI 提示），模型不可用、调用失败或结构化校验失败时回退原文且不写缓存、下次重试，最坏情况等价于原文注入。新增 `living_memory_preset_persona` 表（主键 presetId，预设级派生缓存，不进导出）、表级仓库与 normalizer；卡片服务内存层按原文哈希去重，落库只走 `resolve(presetId)` 并按哈希懒更新，`resolveRendered(rawText)` 供 extraction 每轮现 render 的闭包只读内存层、不落库，避免带会话变量的原文反复覆盖落库口径；插件启动时为全部预设预热（并发 3，逐预设兜底），清空预设数据时同步删除卡片。契约新增 `PresetPersonaRecord`、`PresetPersonaSource` 与只读 `PresetPersonaResolver`；新增删减提示词与 `deletedLineNumbers` 结果工具；同步 AGENTS.md §7，新增 preset-persona 测试覆盖删减、守卫回退、失败重试、哈希复用与手工卡片保护。
+- a908dec: WebUI 新增「人设卡片」标签页并开放只读外部接口。Console 可查看全部已落库卡片（卡片正文、来源、删减行数、更新时间），并以徽标提示三类异常：删减被守卫拦下已回退原文、预设原文在手工编辑后已变动、预设已不存在；支持手工编辑（保存后标记 `source='manual'`，此后不再被自动覆盖）与重新生成（丢弃手工内容并按当前预设原文重建）。服务新增只读视图 `getPresetPersonaCard`/`listPresetPersonas` 与写入口 `savePresetPersonaCard`/`resetPresetPersonaCard`，RPC 新增 `listPresetPersonas`、`savePresetPersonaCard`、`resetPresetPersonaCard` 三个事件；契约新增 `PresetPersonaCardInfo`（含 `stale` 与 `presetMissing` 提示，`stale` 只对手工卡片重算原文比对，自动卡片由哈希懒更新不存在过期态）。外部插件经应用门面只读读取，不开放写入口。同步 AGENTS.md §10，新增手工保存、过期判定、预设缺失、重新生成四类测试。
+
+## 2026-09-28 version:0.24.9
+
+- 65ddd9c: 收紧 Dream 记忆整理的结果契约，让整理决策可观测。此前提示词允许模型在「无需整理」时提交空 operations 数组、且禁止任何解释，导致日志里只能看到 `operations: []`，无法判断模型是否真的审阅了簇内每条记忆（每种操作本就带 `reason`，但空数组无从承载理由）。现要求模型用恰好一个操作覆盖簇内每条记忆——无需改动的用 `keep` 保留、需改动的用 `update`/`merge`/`archive`，禁止空数组与遗漏、禁止同一记忆被多个操作覆盖；`unit_processor` 落库前新增覆盖校验，缺漏、重复或越簇 id 抛错并走结构化输出既有纠错重试（上限 3 次），仍不达标则该单元记为 `structured-output-failed` 跳过、不推进相关记忆固化，失败明细经 `model.parse.failed` 与 `dream.cluster.skipped` 可见。manual、incremental-batch、incremental-seed 三种模式统一适用（增量种子单元带入的候选邻居同样须由 `keep` 覆盖）；随之移除 `unit_processor` 中已被覆盖校验涵盖的冗余 `seed-not-in-operations` 判定。同步更新提示词 `output_contract`、结果工具描述与 AGENTS.md §6，并改写依赖空结果的增量 Dream 测试、补充空 operations 被拒的手动 Dream 回归。无 schema、配置或数据契约变更。
+
+## 2026-09-27 version:0.24.8
+
+- b46e98d: 代码审查低风险项清理，无行为变更。删除两处确认死代码：`service/shared/utils.ts` 的 `cosineSimilarity`（向量相似度计算已下沉 PGlite worker，全仓零引用）与 `transcript/chatluna_transcript_adapter.ts` 的 `toChatLunaTranscriptMessages`（v0.24.0 去轮化后被 `toLogTranscriptMessages` 取代的残留，零引用；同文件仍在用的 `toChatLunaTranscriptMessageResult` 与 `livingMemoryRawContentKey` 保留）。将 `LivingMemoryMutationService` 中 `archiveActiveMemories`、`deleteMemories`、`deleteExpiredArchivedMemories` 三处按 `MEMORY_DELETE_BATCH_SIZE` 切片、逐批写仓储并同步索引、累加计数的同构循环提取为私有 `runBatchedMutation(ids, applyBatch)`，批大小、切片与计数语义收敛为单点，三处只描述各自每批逻辑；空列表短路、批数与每批调用序列、归档快照单次清除、删除的跨预设幂等跳过均保持原样。
+- a076bf4: 代码审查长函数拆分，无行为变更。`workflows/extraction/coordinator.ts` 将 `drain` 的单块排干与失败处理拆出 `drainNextChunk` 与 `handleChunkFailure`（以「是否继续排后续块」的布尔驱动循环），`queue` 的白名单门禁拆出 `isExtractionWhitelisted`，`run` 的提取输入组装改用 `const` 消除声明后赋值并移除随之空置的类型导入；`workflows/recall/coordinator.ts` 将 `runEmbeddingRerank` 的查询改写与跳过判定拆出 `resolveRerankQueryInput`（返回 null 表示本次不检索、不覆盖快照）；`workflows/recall/agentic_recall.ts` 将 `run` 的子模型解析与可用性校验拆出 `resolveChatModel`；`app/living_memory_service.ts` 将构造函数的子系统装配拆出 `createRecallCoordinator`、`createDreamCoordinator`、`createExtractionCoordinator` 与 `scheduleDailyMaintenance`，共享依赖字段前移装配。各拆分保持诊断字段、游标推进、失败重试与跳过语义、依赖注入接线不变。
+- 6c71785: 代码审查接口层收敛，无行为变更。移除 `contracts/workflows.ts` 中两个仅被 implements、无任何消费方按接口类型依赖的角色接口：`ExtractionRepository`（提取写路径实际经 `ExtractionMemoryWriter` 落库以维护铸键不变量，其四个方法均由具体仓储直接调用，接口本身零消费）与 `MessageFormatter`（消费方均依赖具体类 `LivingMemoryMessageFormatter` 或其 `Pick`，接口零消费）；同步从 `LivingMemoryEntryRepository`、`LivingMemoryRepository`、`LivingMemoryMessageFormatter` 的 implements 列表及相关类型导入中移除，并清理随之空置的 `LivingMemoryTranscriptMessage` 导入。其余角色接口（`DreamMemoryRepository`、`DreamSpeakerCoverage`、`RecallRepository`、`JobRepository`、`SnapshotRepository`、`UserProfileRepository`、`UserProfileMemoryRepository`、`LivingMemoryCreationProvider` 等）经逐个甄别均具备多消费方、测试 mock 或独立实现类，属正当 DIP/ISP 分工，予以保留；service→repository→子仓库的只读三层转发受开发规范持久化门面「事务唯一入口」约束，收敛收益不抵破坏单一入口不变量的风险，不予改动。
+- a9c5174: 修复本轮重构全量验证暴露的两处问题，无运行时行为变更。补齐 `tests/living-memory-service-lifecycle.spec.ts` 仓储桩缺失的 `migrateWebuiSourceConversationKeys`——0.24.7 的 WebUI 写回迁移在 `start()` 中新增了该调用却未同步更新此桩，属该提交遗留的潜伏测试失败，本轮首次全量运行测试才触发；并按 oxfmt 归一 `app/memory_mutation_service.ts` 与 `persistence/entries.ts` 在本轮改动中引入的格式偏差。
+
+## 2026-09-27 version:0.24.7
+
+- 04ea556: 落地 WebUI 伪会话键（`webui:` 前缀）的写回迁移，清偿 `docs/webui-legacy-conversation-keys.md` 记录的遗留债务。历史版本 WebUI 手工创建的记忆以 `webui:{presetId}` 占位键写入 `living_memory_entry.sourceConversationId`；v0.22.0 起该列改为读取时折叠为 null，但数据库脏行一直物理留存，绕过 `normalizeEntryRecord` 的原始查询仍会看到幽灵键。新增启动一次性迁移 `webui-source-conversation-cleanup-v1`（经 `living_memory_migration` 幂等表守卫，在向量索引启动前的启动迁移序列中执行），将活跃与归档记忆中以 `webui:` 开头的 `sourceConversationId` 批量写回 null；随后移除 `normalizers.ts` 中针对 `webui:` 前缀的读取折叠分支（空串与 null 折叠保留），并删除已完成的备忘文档。向量索引来源列此前已在对账中补为 null，主库写回后与索引口径一致，无需重建索引。
+
+## 2026-09-27 version:0.24.6
+
+- dc18ce0: 向量索引创建 embedding 前等待 ChatLuna 平台完成初始化，避免启动竞态导致维度探测得到空向量并将索引标记为不可用。
+- c618c13: 完整向量索引重建成功后清除运行时 unavailable 状态，恢复索引读取门禁。
+- 4f7ca1a: 预设级向量索引对账成功后清除运行时 unavailable 状态，恢复后台自愈后的索引读取门禁。
+
+## 2026-09-26 version:0.24.5
+
+- fe797fb: 修复 Dream 任务因 speaker 注册表缺行而确定性崩溃的问题。注册表（`living_memory_preset_speaker`）身兼画像候选集与模型标签字典两职，但写入口只有 before-chat 当前触发者与 WebUI 导入；而记忆的 `speakerKeys` 按提取窗口口径归因，群聊旁观参与者、0.15.4 之前的历史记忆、v≤3 导入文件中未被其自带 presetSpeakers 节覆盖的键都会落在注册表之外，Dream 提示词按 key 反查标签时 `find(...)!` 抛 TypeError 且穿过簇循环，掀翻整个任务并在同一位置永久复现。现确立铸键不变量「任何把新 speakerKey 写上记忆的通道必须同步确保注册表有行」：提取落库前以窗口说话人（真实昵称）补齐缺失行；WebUI/公共创建与更新入口对调用方直供的键在落库前以合成标签补齐；手动与增量 Dream 启动前为活跃记忆上的缺行键以合成标签（`user:<键前 8 位>`）兜底补齐；导入为活跃条目携带的未知键合成注册行且不覆盖既有行。补齐行不带身份字段，画像候选过滤天然排除旁观者，该用户下次直接对话时 reconcile 按 stableId 命中同一行升级为完整身份。注册与记忆写入均在预设级变更队列内执行（提取注册与追加为同一队列操作、Dream 前置补齐与 update 在队列内重读状态），同预设清空既无法插入注册与写入之间，也不会因陈旧读取在清空后的预设上写回孤儿注册行。
+
+## 2026-09-24 version:0.24.4
+
+- 790c89c: 恢复旁听提取开关的原始语义：控制提取窗口之外的远端闲聊是否计入记忆提取。0.24.2 锚定切块重构曾把「不截断、不丢消息」错误扩大到段内闲聊头，超预算段整段成块，使两种模式提取的消息集合完全相同、开关名不副实。现锚定模式（默认）下：交流（触发消息＋回复 run）无条件保留、永不截断；触发交流及其前方一个提取窗口内的消息无条件纳入；窗口之外的积压只保留其中的交流、丢弃闲聊，被丢弃的闲聊随游标推进不再提取。旁听模式不变（窗口之外全量保留、超预算按预算切段）。配置描述与开发规范同步该口径。
+
+## 2026-09-24 version:0.24.3
+
+- 0e44543: 将自动记忆提取相关配置（提取窗口、旁听提取、提取白名单开关与列表）从「基础配置」分组拆分为独立的「记忆提取配置」分组，并将面向用户的配置描述从机制表述改为行为效果表述（「会话日志」「排干」「对话段装块」「pending」「consolidation」等内部术语改写为「聊天消息」「1.5 倍上限」等日常表达）；仅调整配置页展示与文案，配置键与运行时形状不变。
+- 79bdadd: 旁听提取切块对齐锚定模式的模糊预算与尾锚定装包规则。原旁听模式按严格窗口硬切：预算内多段贪心装包在最新一轮前冲刷出无上下文的孤块（与锚定模式已修复的缺陷同构），超出窗口的完整对话段也被从腰斩。现两种模式共用同一从最新闭合段向旧并入整段的尾锚定装包，累计不超过 `extractionWindowMessages` 加其二分之一即并入同块；旁听模式仅保留其专属职责——超出单块预算的超长段先切成不超过预算的子块（边界尽量落在 assistant 之后）再按同一规则装包。配置描述与开发规范同步该口径。
+
+## 2026-09-23 version:0.24.2
+
+- 120fb36: 修复提取排干锚定模式的多块切块设计缺陷。多段积压按贪心从旧到新装块时，块边界恰好切在最新交换之前：最新材料成为无上下文的孤块，主题连续的对话被拆成两次独立提取并产出近乎重复的记忆；超长段取段尾后缀还会把触发消息与回复 run 从中截断。锚定模式改为以段（一轮＝触发消息＋回复 run）为不可分割的原子单位，从最新闭合段向旧并入整段成块：累计不超过 `extractionWindowMessages` 加其二分之一时并入同块（窗口是模糊预算而非硬上限，盈余不超过半窗不开新块，最新一轮不因回复多条被拆开或切走上下文）；余量更大时作为前序块继续同规则提取；超出预算的段独立成块、不截断，不丢消息。旁听模式切分逻辑不变。
+
+## 2026-09-22 version:0.24.1
+
+- d065004: 修复非文本消息元素以元素标签序列化形式进入模型可见聊天记录的问题（如合并转发被记录为 `<forward id="..."/>`、json 卡片整段载荷刷屏），并消除评审确认的关联缺陷：at 昵称查询阻塞采集入账时序（后到消息与回复越序入账，破坏召回边界与提取段归属）、仅 content 的回填消息绕过占位转换（adapter-satori 的 getMessageList 不解析 elements，重启回填重新引入标签串）、文字格式元素（b/code/a 等，Telegram 实际产生）内的正文丢失、逐层 trim 吞掉容器边界空白。新增消息日志模块共享的同步占位提取 `element_text.ts`：文本元素直取正文，文字格式容器递归提取正文（共享 parts、仅顶层 trim 一次，br/段落边界换行），非文本元素替换为占位说明（`[聊天记录]`、`[图片]`、`[卡片:来源] 标题` 等），信息不丢弃；at 不采信群名片口径的 name 属性，按目标用户昵称经 getUser 解析（与说话人标签同口径、可与聊天记录互相指认），采集侧缓存命中才渲染昵称、未命中先记 @id 并后台预热，渲染与实时入账全程不让出事件循环；QQ json 卡片只提取标题（prompt）、来源应用与分享者，Milky 转发携带的标题与摘要一并渲染；采集器与回填统一采用该提取，仅 content 的回填消息经 h.parse 走同一转换，纯非文本消息不再整条丢弃，回填侧先解析渲染可见的 at 目标昵称（占位元素内部不查询）再同步渲染。
+- b6a4123: 修复窗口去轮化重构后模型可见聊天记录的说话人昵称回归为群名片的问题。消息日志写入通道的 name 字段原本按 `author.nick`/`member.name`/`user.nick` 优先解析，而 OneBot/Milky 的这些字段对应群名片（Koishi `session.username` 同样群名片优先，`session.author` getter 还会用 `member` 覆盖 `user`），导致召回历史、提取转写与画像 speaker 的昵称变为群昵称。现统一改为按用户昵称解析：平台采集器与 ChatLuna 触发消息补写直读 `session.event.user.name`，缺失退 userId；Character 触发消息的 focus 作者是重读消息列表末条、与事件 session 用户不保证同一人，条目标签复用按 focus 用户 ID 解析出的 `speakerLabel`，after-chat 私聊 origin 标签同法并共享解析缓存；getMessageList 回填的 `user.name` 口径本就正确，仅移除镜像中不再读取的 `member` 与 `user.nick` 字段。
+
+## 2026-09-21 version:0.24.0
+
+- 7a69f13: 新增会话消息日志模块 `src/service/transcript/message_log/`，为召回与提取提供统一的会话级内存历史视界。按会话维护容量 500 的滚动日志（seq 单调递增；messageId 优先、`(userId, timestamp, content)` 三元组兜底的双键去重；清空推进纪元，拒绝清空时点之前时间戳的消息复活）；`backfill.ts` 经适配器 `getMessageList` 拉取平台历史做冷启动回填（特性检测降级、预热 200 条、失败下次 warmup 重试，无平台时间戳的消息丢弃；文本元素按标准 `attrs.content` 读取，续读游标 `next ?? prev ?? 批首 id` 对齐 @satorijs/protocol BidiList 契约，OneBot/Milky 已实测核对）；`message_log_registry.ts` 维护会话到日志与渠道索引，回填期间实时写入缓冲、结束后按序冲刷，暴露 `isWarm` 供消费方等待回填落地；`loadRecallHistory` 以当前触发消息为边界取其之前最近 N 条（双方均有 messageId 时只按 ID 判定，任一缺失才退三元组兜底，同用户同秒重复内容的不同消息不得互相冒充）；消息角色写入时确定，模型可见历史统一经 `toLogTranscriptMessages` 转换，speakerKey 直接由平台 userId 派生。
+- 83f7f3f: 窗口机制去轮化重构：召回与提取从「轮次」计数改为按会话日志消息条数计数。召回改读日志 last-N：新增 `recallHistoryMessages`（默认 20，当前触发消息之前最近 N 条，等待期间追加的后续闲聊不挤入边界）与 `recallIntervalMessages`（默认 10，两次召回执行之间的消息间隔锚点，闲聊同样推进，0 关闭；首次立即召回语义不变），锚点按预设会话内存隔离、重启重计；召回与提取的上下文不再取自集成方内存窗口，Character maxMessages 截断与 ChatLuna 历史压缩重写不再影响插件视界。提取改为游标排干：新增 `extractionWindowMessages`（默认 30，积压达到即触发排干、亦为单块上限，0 关闭）与 `extractionIncludeOverheard`（默认 false）；消息按段锚定打包，段以连续 bot 回复 run 末条闭合、无 bot 收尾的尾巴不消费；参与锚定模式（默认）超长段只取以段尾结束的窗口后缀，旁听模式按窗口切分全部提取；游标冷启动取首个合规 after-chat 时点日志末位（回填失败待重试的会话顺延至重试成功后的首个 after-chat），不重提取回填历史；单块连续失败 3 次记录 failed job 放弃该块继续后续，不足 3 次中断后连同新消息重试；会话清理即时终止在途排干的后续消费；白名单未命中不初始化游标，日志照常收集供召回使用。新增平台消息采集中间件 `message_collector`（appended，按注册渠道分发，跳过自身与指令）；两条集成 before-chat 显式补写当前触发消息并改读日志历史，after-chat 只追加实际发出的回复段（`<action>` 空回复不产生条目）并以日志窗口发现画像 speaker；ChatLuna 触发消息透传平台 messageId，before-chat 补写、after-chat 回复段与平台监听三处写入共享 messageId 去重键。删除完成轮契约 `LivingMemoryCompletedRound` 与整套轮次缓冲实现（`shared/rounds.ts`、`toCharacterCompletedRound` 等），提取触发不再依赖完成轮构造。配置键 `recallInterval`、`recallHistoryWindowRounds`、`extractionRounds`、`extractionInterval` 删除且不迁移旧值（旧配置残留键被忽略，需按新键重新设置），config_status 提取告警改挂 `extractionWindowMessages > 0`。已知限制：重启丢失内存日志与游标（回填恢复历史、游标重新起算）、指令交互不入日志。
+
+## 2026-09-20 version:0.23.2
+
+- adfd927: 调整 Agentic Recall 提示词：任务步骤改为结合聊天记录思考话题内容并预测聊天走向，记忆查询指引放宽为直接查询相关记忆，不再限定于预测出的话题；输出契约新增记忆描述须有完整主谓宾、尽量给出对后续聊天有价值信息的要求。
+
+## 2026-09-19 version:0.23.1
+
+- 2d139b3: 修复向量索引全局状态被残留状态行永久拖在 building、召回持续失败且 WebUI 恒显「同步中」的问题，并重构索引状态机制。事故根因：`lm_index_preset_state` 中既无 DB 条目也无索引文档的孤儿状态行（历史版本对账中断残留或 v3→v4 升级全表置 building 产生）不在全量对账的预设集合内，永远不会被清除；旧门禁以聚合状态为先导检查，单个非 ready 行即可拦死所有预设的召回。机制整改：预设状态账本只落盘终态 ready/dirty，移除 reconcile 开头的 building 预写、rebuild 重建库内无读者的 building 进度标记、schema 升级的全表 SET building 与变更失败路径按错误瞬态（building/unavailable）落盘；全量对账预设集合扩为 DB 条目 ∪ 索引文档 ∪ 状态行，孤儿行经 total=0 的 clearPreset 删除，存量部署下次启动自愈；就绪门禁改为按预设独立判定，仅索引级条件（manifest 未建立、全局维护窗口进行中、worker 故障）拦截全部读取，A 预设非终态不再阻断 B 预设召回；主进程状态存储重构为 inspection 镜像加运行时 overlay 的单轨模型，启动时播种 worker 初检结果，维护窗口与按预设对账的展示标记互不覆盖。AGENTS.md 设计约束同步记录账本终态与门禁不变量。评审加固：全局维护窗口改为开方负责关窗（计数模型，任务通道的 setCurrentJob(null) 不再触碰窗口，重叠开窗时先结束的任务不得提前关窗）；markPresetState 协议输入收窄为终态 VectorIndexPresetStateMark，账本不变量由编译器承担，孤儿行回归 fixture 改为经 PGlite 直写模拟旧版遗留数据。
+
+## 2026-09-18 version:0.23.0
+
+- b851d05: living_memory_get_messages 改为单条查看并输出渲染文本。输入从 memoryIds 数组改为单个 memoryId，一次只查看一条记忆的来源对话；输出从 pretty JSON 改为复用来源消息已存的 transcriptLines 按原始聊天记录格式渲染，多段来源分组编号，头部仅保留 id 与 sourceLabel（此前推迟的 source= 渲染随本条落地），去除与 living_memory_search 结果重复的记忆元信息和同正文三重冗余；记忆不存在时明确提示。契约、投影与服务签名同步瘦身。来源消息 transcriptLines 随之改为必填字段：类型收紧为 string[]，读取边界对缺失或非字符串数组的消息、空 messages 来源组一律抛错，畸形手工导入文件不再被静默导入为半空消息，渲染层兜底随之移除。
+- aa05790: living_memory_search 主对话工具新增必填 memoryStatus 参数（active/archived/all），允许模型显式检索归档记忆；工具 schema 与描述按实例区分，召回内部实例不暴露该参数。向量索引查询协议与 SQL 过滤同步参数化 status 条件，召回检索（embedding-rerank）、agentic recall 内部搜索与 Dream 邻居查询显式固定 active，行为不变；WebUI 检索 RPC 走引擎默认活跃，行为不变。客户端契约镜像同步 memoryStatus，基准脚本状态参数展开与 worker 语义对齐，AGENTS.md 索引约束相应改写。
+- b49104b: 全仓 oxfmt 格式化清偿存量格式偏差。格式化 16 个 src/tests TypeScript 文件与 2 个 client 组件，全部为折行重排与联合类型排版调整，语义零变化；新增 .prettierignore 排除 *.md，markdown 保持手写排版不参与格式化，AGENTS.md 等文档不受影响；oxfmt 默认尊重 .gitignore，lib/dist 生成产物不在覆盖范围。
+- 6a87c7e: lint 门禁纳入 oxfmt --check。yarn lint 从仅运行 oxlint 改为 oxlint 加格式检查，格式偏差自此无法通过标准验证流程；AGENTS.md 验证要求同步注明。已做负向自检：注入格式偏差后 yarn lint 退出码 1，还原后通过。
+
+## 2026-09-18 version:0.22.1
+
+- 071822e: 修复 WebUI 快照详情弹窗命中记忆较多时超出部分被裁剪且无法滚动的问题。Console 宿主样式把弹窗容器改为居中 flex 列布局，超高的弹窗会被压缩到视口高度、再被弹窗自身的 overflow: hidden 裁剪；现对快照弹窗限高并让正文内部滚动，标题栏保持固定。同时修正该弹窗遮罩类名的笔误以恢复遮罩背景样式，并移除其样式文件中没有竞争规则的 !important。
+
+## 2026-09-18 version:0.22.0
+
+- e30f2c7: 将 Agentic Recall 的搜索结果日志改为记录工具实际返回给模型的格式化内容，避免日志展示模型不可见的记忆字段。
+- 2473549: 记忆条目新增 sourceLabel 来源标签字段。两条集成路径的提取流程与输入头部共用同一来源短语解析（私聊记录对话对象昵称与用户 ID，群聊记录群名与群 ID），解析结果随提取记忆落库；living_memory_search 与用户画像共用的模型记忆视图在标签非空时渲染 source= 行，WebUI 记忆卡片同步展示；导入导出格式升至 v4，v3 及更早备份导入后该字段为空。sourceConversationId 机器键保持不变。
+- 3a2e557: 统一记忆来源会话键的空值口径。`sourceConversationId` 表列改为可空，null 成为「无会话归属、全局可见」的单一判定；WebUI 手工创建记忆不再写入 `webui:{presetId}` 占位键，落库为 null；读取边界把空串与历史 `webui:` 前缀旧值折叠为 null，导出与后续会话隔离过滤看到的口径一致。旧值写回迁移机制备忘见 `docs/webui-legacy-conversation-keys.md`。
+- b2b1a19: WebUI 导入校验支持 v4 备份，恢复当前版本导出文件的界面导入能力。
+- b2b1a19: Dream 合并按来源会话键统一处理 sourceConversationId 与 sourceLabel；全部参与记忆的会话键相等时（包括全部为 null）保留目标的会话键和标签，否则在同一事务内将两者清空。null 表示无会话归属，约定为预设内全局可见。来源原始消息仍完整合并，昵称或群名变化不影响会话归属判断。
+- 4bd2059: 新增默认关闭的 enableConversationIsolation，开启后两种召回策略和 living_memory_search 按当前会话及全局记忆过滤。来源会话作为索引元数据同步，语义与关键词检索均在候选截断前过滤；v3 索引原地升级至 v4 并通过启动对账补齐来源，保留已有向量。用户画像、Dream、来源消息工具、旧快照和管理操作沿用既定范围。
+- 6f62631: living_memory_search 开启会话隔离时改用作用域解析结果的完整 presetId 与 conversationId，关闭时仅做预设解析，消除同一请求内的重复预设解析；CHANGELOG 同步回填既有提交哈希并删去过时的「当前召回尚未实现会话过滤」表述。
+
+## 2026-09-08 version:0.21.2
+
+- a0010fd: 修复创建记忆、搜索记忆和读取来源消息工具仍从顶层 source 判断预设来源的问题，统一读取 agentContext.source，确保同名 ChatLuna 与 Character 预设分别访问各自记忆库；Character 创建记忆继续使用群聊/私聊会话键，并在来源分支前拒绝子代理创建记忆。
+
+## 2026-09-06 version:0.21.1
+
+- 5706b90: 将 `entries.ts`、`rebuild.ts` 与 `reconcile.ts` 三处游标分页循环由 `do...while (true)` 改写为语义等价的 `while (true)` 形式，恢复 `yarn lint` 的 `no-constant-condition` 基线通过，并删除 `.oxlintrc.json` 中针对 `rebuild.ts`/`reconcile.ts` 的该规则豁免；oxlint 默认放行裸 `while (true)` 而始终拒绝 `do...while (true)`，统一写法后新的游标分页无需再逐文件豁免。
+- bcbd4ea: 修正 README 本地开发的构建命令为 `yarn workspace koishi-plugin-chatluna-livingmemory build`。原命令 `yarn build chatluna-livingmemory` 只执行 yakumo 共享构建管道，不运行包内脚本，产物缺少 `lib/vector-index-worker.mjs` 与 `lib/dream-hdbscan-worker.mjs`，插件启动后向量索引会因找不到 Worker 报 `MODULE_NOT_FOUND`；新命令运行本包完整构建链（服务端、Worker 与 Console 客户端）。
+- 2e50e53: 更新插件版本至 0.21.1。
+
+## 2026-09-06 version:0.21.0
+
+- 7b8aab9: 新增自动记忆提取白名单配置。开启 `enableExtractionWhitelist` 后只有 `extractionWhitelist` 列出的会话会自动提取记忆，群聊比对群号、私聊比对用户 id，两者都取自平台原始 id，因此 ChatLuna 主插件与 Character 两条接入路径共用同一份列表。未命中的会话在进入轮次缓冲前返回，不累计轮次也不占用缓冲；白名单只约束自动提取，召回、快照与用户画像注入以及 `living_memory_create_memory` 均不受影响。
+- 0d9e248: 精简 `AGENTS.md`，删除与全局工程规范重复、可由代码或配置直接读出的条目，代码结构说明收敛到目录粒度并相应放宽同步义务；npm Trusted Publisher 与仓库、工作流文件名的绑定关系移入 `publish.yml` 顶部注释，保留在改名者实际会看到的位置。
+
+## 2026-09-04 version:0.20.3
+
+- 5baf5b4: 更新插件版本至 0.20.3。
+- 76833ff: 修正 `living_memory_entry` 待处理记忆组合索引在 MySQL 下无法创建的问题。该索引原先使用 minato 按列名拼接的默认名，长 69 字符，超出 MySQL 64 字符的标识符上限，`createIndex` 抛出的异常会留在 minato 的 prepareTasks 中使 `Database.prepared()` 始终拒绝，而所有查询在执行前都要等待它，导致整个 Koishi 实例的数据库访问全部失败。现显式指定索引名 `index:living_memory_entry:dream_pending`，并在服务启动时删除与该索引同列但名字不同的历史索引（SQLite 保留旧全名、PostgreSQL 截断至 63 字符，minato 都不会自动清理），同时补充索引名长度不超过 64 字符与旧索引清理的测试。
+
+## 2026-09-04 version:0.20.2
+
+- 98943b4: 更新插件版本至 0.20.2。
+- 1b4e668: 统一记忆 `summary` 字段的空值口径，表定义改为与 `sentiment` 一致的可空且默认 null，记录读取规范化补上 `summary` 的空串折叠。
+- b293c3a: 记忆编辑界面的关键词改为必填，并按 `MAX_MEMORY_KEYWORDS` 限制最多可选数量，避免超出上限的关键词在服务端被静默截断。
+- f184fdd: 记忆编辑界面将摘要、情绪与重要度改为必填，标注必填星号并在提交前校验，不再把空白摘要与情绪提交为 null，同时移除重复的重要度裁剪。
+- 05d87c2: 删除召回改写提示词测试中断言输入消息包含助手昵称的陈旧断言，该昵称现在只出现在系统提示词里。
+- 6f42273: 记忆搜索工具改为返回与人物画像共用的记忆视图文本，只保留 type、updatedAt、sentiment 与正文，对话工具附带记忆 ID 而 Agentic Recall 不附带，未命中时返回明确提示；召回结果补充 sentiment 字段，Agentic Recall 的快照命中记忆改为直接使用结构化召回结果，不再解析工具输出文本。
+- 7d2de31: 删除快照详情中永远显示为空的命中查询区块，并移除浏览器侧契约镜像里服务端从未产出的 `matchedSearchTexts` 字段及其样式规则。
+- 54a0601: 精简人物画像提示词的记忆输入，移除记忆 ID 与创建时间，情绪为空时不再输出该字段，并在记忆列表前说明关联记忆总数与实际送入条数；同时移除记忆渲染中的时间戳容错转换，并把画像提示词构造移入模型调用的错误处理范围。
+- ae414c9: 新增启动 Dream 所需的最少活跃记忆条数（一个整理单元 30 条），手动触发返回记忆量不足供 WebUI 提示，自动触发只记录跳过日志，并移除手动 Dream 中零条与单条活跃记忆的特例分支。
+- 629981b: 修正手动 Dream 在预设仅有一条活跃记忆且模型不可用时丢弃固化结果的问题，改为保留原结果并在详情中追加画像阶段的跳过原因，并补充手动流程整理失败时不补算画像的依据说明。
+- 847da4d: 人物画像生成跳过输入未变化的用户，判据为选中来源记忆集合未变且画像写入时刻严格晚于组内全部记忆的更新时刻，并在生成结果详情中记录跳过数量。
+- 74aaefb: 将活跃记忆用户关联索引的回填迁移改为事务内 id 游标分页读取，峰值内存只与单页记忆条数相关，并将记忆读取页长与关联行写入批长拆分为两个常量。
+
+## 2026-09-03 version:0.20.1
+
+- ed4bc91: 更新插件版本至 0.20.1。
+- e5e6ee8: 收敛画像开关的判定点为画像服务自述，拆分画像仓储与记忆索引查询契约并为两侧实现补齐静态校验，重新抽出画像分组与时间戳辅助方法，并将画像记忆数量门槛合并为一次判定。
+- e0e47d6: 修正活跃记忆用户关联索引在跨预设记忆批次下的删除口径，按各条记忆自身的 presetId 分组删除旧关联行。
+- 2ca52bf: 收敛持久化事务与串行化约定，统一事务入口与串行队列实现，将人物画像写入、预设用户写入与记忆来源字段清洗迁移纳入事务，并统一重复画像行的规范行口径。
+
+## 2026-09-02 version:0.20.0
+
+- e18f4b4: 更新插件版本至 0.20.0。
+- 8352be7: 新增活跃记忆用户关联索引，在手动与自动增量 Dream 后按受影响用户更新人物画像，并修复不同 TypeScript 版本导致的工作区构建失败。
+- 92a3159: 简化人物画像写入处理，取消内容长度上限与标题清理，并仅记录本次生成使用的来源记忆。
+
+## 2026-09-01 version:0.19.3
+
+- a47a199: 更新插件版本至 0.19.3。
+- 05c67b7: 精简人物画像生成时的记忆输入字段，移除重要度、关键词和摘要。
+- db563a2: 优化人物画像关联记忆分组流程，按活跃记忆直接建立用户分组。
+- 7342a2a: 新增生成人物画像所需的最少活跃记忆数量配置。
+
+## 2026-09-01 version:0.19.2
+
+- ca9ef56: 更新插件版本至 0.19.2。
+- d913aee: 简化人物画像生成提示词与结果协议，统一人物画像术语与关系视角，并由服务层维护来源记忆。
+- 7ef3bba: 统一 Dream 与记忆提取提示词措辞，移除一次性提取工具描述常量。
+
+## 2026-08-31 version:0.19.1
+
+- 7e1ca9b: 更新插件版本至 0.19.1。
+- ad4ccab: 调整 Dream 整理任务、操作判断、跨字段约束与结果提交提示词的表达。
+- 30ba2ac: 简化 Dream 结果工具 Schema，将操作参数定义集中并直接推导结果类型。
+- 1adf792: 精简 Dream 提示词与结果契约，移除全量用户昵称输入并限制整理后的用户关联来源于原记忆。
+- 7b5ce1a: 移除 Dream 提示词构建中的一次性中间抽象及对模型无用的预设、记忆簇标识和聚类原因。
+- 69f46cd: 记忆编辑界面支持修改关联用户，并同步更新 RPC、服务与持久化契约。
+
+## 2026-08-31 version:0.19.0
+
+- 9a81017: 更新插件版本至 0.19.0。
+- c64782a: 为归档记忆增加基于重要度与更新时间的自动衰减清理机制，过期后永久删除并同步向量索引。
+
+## 2026-08-31 version:0.18.4
+
+- 1d58b18: 更新插件版本至 0.18.4。
+- e23efcf: 新增基于 GitHub Actions 与 npm Trusted Publisher 的自动构建发布流程。
+
+## 2026-08-31 version:0.18.3
+
+- c49405e: 更新插件版本至 0.18.3。
+- 42fcd0a: 参照当前项目架构重写开发规范，补充模块职责、设计约束与验证要求。
+- 6ddf1ad: 移除没有生产调用者的归档记忆向量检索能力，并修正 Dream 归档行为说明。
+
+## 2026-08-31 version:0.18.2
+
+- 7da66db: 更新插件版本至 0.18.2。
+- 564157c: 为记忆与用户画像删除指令新增 `-d`、`-t`、`-u` 和 `-p` 简写选项。
+- 7ca9843: 简化预设来源选择，默认匹配 ChatLuna 预设，并使用 `-c` 选择 Character 预设。
+
+## 2026-08-31 version:0.18.1
+
+- 2db135a: 更新插件版本至 0.18.1。
+- 2f74ce8: 新增按预设与用户 ID 单独删除用户画像的管理指令，并保留原有记忆与用户身份映射。
+- f6186ed: 移除 Dream 模型输入和写入契约中无意义的记忆状态与归档固化字段。
+- 8db221b: Dream 仅整理活跃记忆，不再读取、聚类、更新或合并已归档记忆。
+
+## 2026-08-31 version:0.18.0
+
+- 0035c86: 更新插件版本至 0.18.0。
+- bacf3ab: 新增按预设文本或关联用户筛选活跃记忆的管理指令，经二次确认后统一归档并清理旧召回快照。
+
+## 2026-08-31 version:0.17.0
+
+- 8235472: 更新插件版本至 0.17.0。
+- 029b5f5: 允许将自动记忆召回轮次间隔设为 0，以完全停用自动召回。
+- f74d8d8: 整理插件配置分组，将嵌入与重排序模型归入模型配置，并集中展示记忆召回相关配置。
+- ffc453f: 新增自动记忆召回轮次间隔配置，按预设与会话独立计数，并在首次对话及间隔到达时执行召回。
+
+## 2026-08-30 version:0.16.2
+
+- cfb38d9: 更新插件版本至 0.16.2。
+- bcebac3: 自动提取流程按模型填写的用户昵称关联记忆，并映射为稳定用户标识。
+- a84cb3: 将模型生成记忆的字段说明与格式约束收敛至结果工具 Schema。
+- 509fef0: 在记忆提取输入中标注私聊或群聊来源及对应标识。
+- 8decde5: 移除聊天记录格式的重复说明，直接使用规范化后的记录内容。
+- 02d5db2: 精简记忆提取提示词，删除与结果工具契约重复的字段规则。
+- ada3f0c: 统一普通生成、主动创建与 Dream 流程使用的记忆字段 Schema 约束。
+- afb1d12: 统一自动提取、主动创建及 Dream 更新合并时的记忆用户关联行为。
+- 6c28277: 统一聊天记录使用 chat_history 包裹，单独的末条消息使用 last_message 包裹。
+- 4ef0e28: 简化 Agentic Recall 终止流程，移除额外收尾调用，并在无有效记忆时保留旧快照。
+- 6add7dc: 删除提示词输入中重复的 assistant_label 数据块。
+- 54b1f8c: 移除 Agent 记忆查询工具的记忆类别参数，查询固定覆盖全部活跃记忆类别。
+- 37a0c9f: 移除来源消息查询的记忆 ID 数量上限，完整返回所请求记忆的来源消息。
+- 430610f: 精简 Agentic Recall 的任务、工具与输出契约文案。
+- 5b6140d: 修复根工作区构建时记忆查询工具输入字段被推导为可选的问题。
+
+## 2026-08-29 version:0.16.1
+
+- 44e05c5: 更新插件版本至 0.16.1。
+- 67b8557: 为普通记忆增加稳定用户关联，统一 ChatLuna 与 Character 的全局昵称解析，并将用户画像生成改为依据稳定用户键精确选择来源记忆。
+- 445c6f7: 召回与画像的历史加载先按 recallHistoryWindowRounds 切窗再转换，不再全量转换，并避开 ChatLuna infiniteContext 压缩摘要等无 id 历史导致的召回退化；Character 侧同步补齐切窗。
+- fc229ef: 说话人解析跨轮缓存并复用平台查询结果，缓存键含平台防互串，失败条目不缓存、下一轮重试。
+- 25cb9a3: 删除 MemoryScope 的死字段 speakerName。
+- c0df797: Dream 记忆合并回归纯语义判定，合并产物的 speakerKeys 取全部源记忆的并集。
+- e60adbd: buildMemoryEntry 说话人键改为必填参数，调用点显式传值。
+- f565bf3: 删除 speakerKeys 归一化的多余强转。
+- 5504f35: scope 构建函数还原为同步。
+- e0cb2b1: 导入条目行构建分支平铺，V1/V2/V3 语义不变。
+- 5e1fc2a: 记忆列表支持按关联用户筛选与展示，补全 listPresetSpeakers RPC 与客户端部分。
+
+## 2026-08-28 version:0.16.0
+
+- e1b15ef: 更新插件版本至 0.16.0。
+- 39536fc: 重构 PGlite Vector Index 所有权生命周期，修复 HMR 交接与跨进程并发打开问题，移除锁文件和原生扩展依赖，并补充根工作区构建所需的类型兼容调整。
+- 39536fc: 明确升级前需完整停止旧插件进程；确认停止后可手工删除旧 `vector-index.lock`，新版本不再创建该文件。
+- fc9520f: 升级构建、类型检查、代码检查与格式化工具链，将测试运行器迁移至 Vitest，并统一 Worker 构建准备与测试文件并行执行。
+
+## 2026-08-25 version:0.15.7
+
+- b51f590: 优化召回快照日志，将多行召回内容改为独立区块显示。

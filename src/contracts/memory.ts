@@ -1,0 +1,365 @@
+export const memoryEntryTypes = [
+    'identity',
+    'preference',
+    'fact',
+    'plan',
+    'context',
+    'other'
+] as const
+
+export const memoryJobKinds = ['recall', 'extract', 'dream', 'index'] as const
+
+export const memoryJobStatuses = [
+    'pending',
+    'running',
+    'completed',
+    'partial',
+    'failed'
+] as const
+
+export const memoryEntryStatuses = ['active', 'archived'] as const
+
+export type MemoryEntryType = (typeof memoryEntryTypes)[number]
+export type MemoryEntryStatus = (typeof memoryEntryStatuses)[number]
+export type MemoryJobKind = (typeof memoryJobKinds)[number]
+export type MemoryJobStatus = (typeof memoryJobStatuses)[number]
+
+export const livingMemorySearchMemoryTypes = [
+    ...memoryEntryTypes,
+    'all'
+] as const
+
+export type LivingMemorySearchMemoryType =
+    (typeof livingMemorySearchMemoryTypes)[number]
+
+export type MemorySearchStatus = MemoryEntryStatus | 'all'
+
+export interface LivingMemorySearchInput {
+    searchTexts: string[]
+    searchKeywords?: string[]
+    memoryTypes: LivingMemorySearchMemoryType[]
+    memoryStatus?: MemorySearchStatus
+}
+
+export interface LivingMemorySearchResult extends Pick<
+    MemoryEntryRecord,
+    | 'id'
+    | 'type'
+    | 'content'
+    | 'keywords'
+    | 'summary'
+    | 'sentiment'
+    | 'importance'
+    | 'sourceLabel'
+    | 'createdAt'
+    | 'updatedAt'
+> {}
+
+export interface LivingMemorySearchDetailedResult extends LivingMemorySearchResult {
+    cosineScore: number
+    keywordMatchCount: number
+    boostedScore: number
+    /** 未配置 Reranker 或重排失败回退时为 null，结果按 boostedScore 排序。 */
+    rerankScore: number | null
+}
+
+export interface AgenticMemorySearchToolCallSummary {
+    searchTexts: string[]
+    searchKeywords: string[]
+    maxCandidates: number
+}
+
+export interface AgenticMemorySnapshotMemoryItem extends Pick<
+    LivingMemorySearchResult,
+    | 'type'
+    | 'content'
+    | 'keywords'
+    | 'summary'
+    | 'sentiment'
+    | 'importance'
+    | 'createdAt'
+    | 'updatedAt'
+> {}
+
+export interface AgenticMemorySnapshotItem {
+    finalText: string
+    toolCallSummary: AgenticMemorySearchToolCallSummary
+    matchedMemories: AgenticMemorySnapshotMemoryItem[]
+}
+
+export interface MemoryScope {
+    conversationId: string
+    presetId: string
+    presetLabel?: string
+    userId?: string
+    channelId?: string
+    guildId?: string
+    isDirect?: boolean
+    speakerId?: string
+    platform?: string
+}
+
+export interface MemorySourceMessage {
+    role: 'user' | 'assistant' | 'system'
+    speakerLabel?: string
+    contentLines?: string[]
+    createdAt?: string
+    transcriptLines: string[]
+    content: string
+}
+
+export interface MemorySourceOrigin {
+    messages: MemorySourceMessage[]
+}
+
+export interface LivingMemoryGetMessagesMemory {
+    id: string
+    sourceLabel: string | null
+    sourceOrigins: MemorySourceOrigin[]
+}
+
+export interface LivingMemoryTranscriptMessage {
+    role: 'user' | 'assistant'
+    speakerKey?: string
+    speakerLabel: string
+    contentLines: string[]
+    createdAt: Date
+}
+
+export interface MemoryEntryRecord {
+    id: string
+    presetId: string
+    speakerKeys: string[]
+    type: MemoryEntryType
+    status: MemoryEntryStatus
+    content: string
+    keywords: string[]
+    summary: string | null
+    sentiment: string | null
+    importance: number | null
+    sourceConversationId: string | null
+    sourceLabel: string | null
+    /** 由来源会话推断的平台标识；数据库不单独持久化，避免与旧数据迁移耦合。 */
+    platform?: string | null
+    sourceOrigins: MemorySourceOrigin[]
+    createdAt: Date
+    updatedAt: Date
+}
+
+export interface LivingMemoryMigrationRecord {
+    id: string
+    appliedAt: Date
+}
+
+export interface MemorySnapshotRecord {
+    id: string
+    presetId: string
+    conversationId: string
+    query: string
+    items: AgenticMemorySnapshotItem[]
+    createdAt: Date
+}
+
+export interface MemoryJobRecord {
+    id: string
+    presetId: string
+    conversationId: string
+    kind: MemoryJobKind
+    status: MemoryJobStatus
+    input: string
+    detail: string | null
+    error: string | null
+    createdAt: Date
+    startedAt: Date | null
+    finishedAt: Date | null
+    updatedAt: Date
+}
+
+export interface UserProfileRecord {
+    id: string
+    presetId: string
+    speakerKey: string
+    speakerLabel: string
+    content: string
+    sourceMemoryIds: string[]
+    createdAt: Date
+    updatedAt: Date
+}
+
+export interface UserProfileInput {
+    speakerKey: string
+    speakerLabel: string
+    content: string
+    sourceMemoryIds: string[]
+}
+
+export interface PresetSpeakerRecord {
+    id: string
+    presetId: string
+    speakerKey: string
+    speakerLabel: string
+    speakerAliases: string[]
+    speakerId: string | null
+    platform: string | null
+    createdAt: Date
+    updatedAt: Date
+}
+
+export interface PresetSpeakerInput {
+    presetId: string
+    speakerKey: string
+    speakerLabel: string
+    speakerId?: string | null
+    platform?: string | null
+}
+
+/**
+ * 预设人设卡片。由预设原文按行删减掉纯操作性内容（工具调用指南、输出与格式
+ * 规范、状态模板等）得到，供记忆提取、Dream 整理与用户画像注入。
+ *
+ * `rawHash` 是生成卡片所依据的预设原文指纹；预设变动后哈希对不上即视为过期，
+ * 由消费方提示（不自动覆盖手改卡片）。`usedRawFallback` 表示删减异常（越界、
+ * 删除比例过高、剪出的卡片过短）已回退为原文。
+ */
+export interface PresetPersonaRecord {
+    presetId: string
+    card: string
+    rawHash: string
+    source: PresetPersonaSource
+    totalLines: number
+    deletedLines: number
+    usedRawFallback: boolean
+    updatedAt: Date
+}
+
+export type PresetPersonaSource = 'generated' | 'manual'
+
+/**
+ * 预设人设卡片的只读视图，供 Console 与外部插件展示。`stale` 表示手工卡片
+ * 编辑后预设原文已变动；它只是提示：工作流仍按现状使用卡片，`manual` 卡片
+ * 永不自动覆盖。
+ */
+export interface PresetPersonaCardInfo {
+    presetId: string
+    card: string
+    source: PresetPersonaSource
+    totalLines: number
+    deletedLines: number
+    usedRawFallback: boolean
+    stale: boolean
+    updatedAt: Date
+}
+
+/**
+ * 预设人设卡片解析入口。各工作流只依赖这一契约，由
+ * `LivingMemoryPresetPersonaService` 实现。
+ */
+export interface PresetPersonaResolver {
+    resolveOrGenerateCardText(presetId: string): Promise<string>
+}
+
+export interface MemoryMutationInput {
+    type: MemoryEntryType
+    status?: MemoryEntryStatus
+    content: string
+    keywords?: string[]
+    summary?: string | null
+    sentiment?: string | null
+    importance?: number | null
+}
+
+export type MemoryUpdatePatch = Partial<MemoryMutationInput> & {
+    speakerKeys?: string[]
+}
+
+export interface LivingMemoryPresetExportEntry {
+    id: string
+    type: MemoryEntryType
+    status: MemoryEntryStatus
+    content: string
+    keywords: string[]
+    summary: string | null
+    sentiment: string | null
+    importance: number | null
+    sourceConversationId: string | null
+    sourceOrigins: MemorySourceOrigin[]
+    createdAt: string
+    updatedAt: string
+}
+
+export interface LivingMemoryPresetExportEntryV3 extends LivingMemoryPresetExportEntry {
+    speakerKeys: string[]
+}
+
+export interface LivingMemoryPresetExportEntryV4 extends LivingMemoryPresetExportEntryV3 {
+    sourceLabel: string | null
+}
+
+export interface LivingMemoryPresetExportUserProfile {
+    id: string
+    speakerKey: string
+    speakerLabel: string
+    content: string
+    sourceMemoryIds: string[]
+    createdAt: string
+    updatedAt: string
+}
+
+export interface LivingMemoryPresetExportSpeaker {
+    speakerKey: string
+    speakerLabel: string
+    speakerAliases?: string[]
+    speakerId: string | null
+    platform?: string | null
+    createdAt: string
+    updatedAt: string
+}
+
+interface LivingMemoryPresetExportBase {
+    exportedAt: string
+    sourcePresetId: string
+    userProfiles: LivingMemoryPresetExportUserProfile[]
+    presetSpeakers: LivingMemoryPresetExportSpeaker[]
+}
+
+export interface LivingMemoryPresetExportV1 extends LivingMemoryPresetExportBase {
+    version: 1
+    entries: LivingMemoryPresetExportEntry[]
+}
+
+export interface LivingMemoryPresetExportV2 extends LivingMemoryPresetExportBase {
+    version: 2
+    entries: LivingMemoryPresetExportEntry[]
+}
+
+export interface LivingMemoryPresetExportV3 extends LivingMemoryPresetExportBase {
+    version: 3
+    entries: LivingMemoryPresetExportEntryV3[]
+}
+
+export interface LivingMemoryPresetExportV4 extends LivingMemoryPresetExportBase {
+    version: 4
+    entries: LivingMemoryPresetExportEntryV4[]
+}
+
+export interface LivingMemoryPresetExportV5 extends LivingMemoryPresetExportBase {
+    version: 5
+    entries: LivingMemoryPresetExportEntryV4[]
+}
+
+export type LivingMemoryPresetExport =
+    | LivingMemoryPresetExportV1
+    | LivingMemoryPresetExportV2
+    | LivingMemoryPresetExportV3
+    | LivingMemoryPresetExportV4
+    | LivingMemoryPresetExportV5
+
+export interface LivingMemoryPresetImportSummary {
+    entries: number
+    userProfiles: number
+    presetSpeakers: number
+}
+
+export interface LivingMemoryPresetImportResult extends LivingMemoryPresetImportSummary {
+    indexJobId: string
+}
