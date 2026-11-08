@@ -1,4 +1,3 @@
-import { isRequestFailure } from 'koishi-plugin-chatluna/utils/error'
 import type { ChatLunaChatModel } from 'koishi-plugin-chatluna/llm-core/platform/model'
 import type {
     LivingMemoryTranscriptMessage,
@@ -26,6 +25,23 @@ import {
     resolveIdentityLabel
 } from './memory/identity_aliases'
 import { SerialTaskQueue } from './shared/serial_task_queue'
+
+// 不要从 koishi-plugin-chatluna/utils/error 静态导入：
+// ChatLuna 1.4.x 的 error.cjs 会反向 require 主入口，子路径先加载时形成循环依赖，
+// 导致 ChatLunaErrorCode 为 undefined，整个 Koishi 启动失败。
+const REQUEST_FAILURE_CODES = new Set([1, 102, 103, 105, 5])
+
+function isRequestFailure(error: unknown): boolean {
+    if (error instanceof Error) {
+        if (error.name === 'AbortError') return true
+        const code = (error as Error & { code?: unknown }).code
+        if (code === 'ABORT_ERR') return true
+    }
+    const errorCode = (
+        error as { errorCode?: unknown; code?: unknown } | null | undefined
+    )?.errorCode
+    return typeof errorCode === 'number' && REQUEST_FAILURE_CODES.has(errorCode)
+}
 
 export const normalizeManualUserProfileContent = (content: string) => {
     const normalized = content.trim()
