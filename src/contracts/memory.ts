@@ -194,6 +194,27 @@ export interface UserProfileInput {
     sourceMemoryIds: string[]
 }
 
+export interface IdentityLinkRecord {
+    id: string
+    presetId: string
+    platform: string
+    platformUserId: string
+    canonicalSpeakerKey: string
+    confidence: number
+    source: string
+    createdAt: Date
+    updatedAt: Date
+}
+
+export interface IdentityLinkInput {
+    presetId: string
+    platform: string
+    platformUserId: string
+    canonicalSpeakerKey: string
+    confidence?: number
+    source?: string
+}
+
 export interface PresetSpeakerRecord {
     id: string
     presetId: string

@@ -11,6 +11,8 @@ import type {
     MemoryMutationInput,
     MemoryUpdatePatch,
     MemorySnapshotRecord,
+    IdentityLinkInput,
+    IdentityLinkRecord,
     PresetPersonaCardInfo,
     PresetSpeakerRecord,
     UserProfileRecord
@@ -136,6 +138,15 @@ export interface LivingMemoryConsoleEvents {
     ) => Promise<{ generated: number; detail: string }>
     'living-memory/deleteUserProfile': (
         profileId: string
+    ) => Promise<{ success: true }>
+    'living-memory/listIdentityLinks': (
+        presetId: string
+    ) => Promise<IdentityLinkRecord[]>
+    'living-memory/upsertIdentityLink': (
+        input: IdentityLinkInput
+    ) => Promise<{ success: true }>
+    'living-memory/deleteIdentityLink': (
+        id: string
     ) => Promise<{ success: true }>
     'living-memory/runDream': (presetId: string) => Promise<DreamTriggerResult>
     'living-memory/reconcileVectorIndex': (

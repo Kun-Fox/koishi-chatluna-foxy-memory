@@ -3,6 +3,7 @@ import { resolve } from 'path'
 import { Context } from 'koishi'
 import type {} from '@koishijs/plugin-console'
 import type {
+    IdentityLinkInput,
     LivingMemoryPresetExport,
     LivingMemorySearchInput,
     MemoryUpdatePatch
@@ -178,6 +179,26 @@ export function apply(ctx: Context, _config?: LivingMemoryConfig) {
         'living-memory/deleteUserProfile',
         ok(async (profileId: string) => {
             await service(ctx).deleteUserProfile(profileId)
+        })
+    )
+
+    ctx.console.addListener(
+        'living-memory/listIdentityLinks',
+        async (presetId: string) =>
+            await service(ctx).listIdentityLinks(presetId)
+    )
+
+    ctx.console.addListener(
+        'living-memory/upsertIdentityLink',
+        ok(async (input: IdentityLinkInput) => {
+            await service(ctx).upsertIdentityLink(input)
+        })
+    )
+
+    ctx.console.addListener(
+        'living-memory/deleteIdentityLink',
+        ok(async (id: string) => {
+            await service(ctx).deleteIdentityLink(id)
         })
     )
 

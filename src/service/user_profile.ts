@@ -7,6 +7,7 @@ import type {
 } from '../contracts/memory'
 import type {
     DreamMemoryEntryRecord,
+    IdentityLinkRepository,
     LivingMemoryConfig,
     UserProfileMemoryRepository,
     UserProfileRepository
@@ -16,7 +17,10 @@ import { userProfileResultTool } from './prompts/memory_tools'
 import { buildUserProfilePrompts } from './prompts/user_profile'
 import { invokeStructuredOutput } from './workflows/structured_output'
 import { formatLogScope, type LivingMemoryLogger } from './logging/logger'
-import { normalizeSpeakerKeys } from './memory/speaker_identity'
+import {
+    createSpeakerKey,
+    normalizeSpeakerKeys
+} from './memory/speaker_identity'
 import {
     buildIdentityAliasMap,
     resolveIdentityLabel
@@ -86,7 +90,8 @@ export class LivingMemoryUserProfileService {
     constructor(
         private readonly config: LivingMemoryUserProfileConfig,
         private readonly repository: UserProfileRepository &
-            UserProfileMemoryRepository,
+            UserProfileMemoryRepository &
+            IdentityLinkRepository,
         private readonly logger: LivingMemoryLogger,
         private readonly presetPersona: PresetPersonaResolver,
         private readonly createModel: () => Promise<ChatLunaChatModel>
@@ -450,6 +455,14 @@ export class LivingMemoryUserProfileService {
         }
 
         const aliases = buildIdentityAliasMap(this.config.identityAliases)
+        const identityLinks =
+            await this.repository.listIdentityLinks(presetId)
+        for (const link of identityLinks) {
+            aliases.set(
+                createSpeakerKey(link.platform, link.platformUserId),
+                link.canonicalSpeakerKey
+            )
+        }
         const profiles =
             aliases.size > 0
                 ? await this.repository.listUserProfilesByPreset(presetId)

@@ -12,6 +12,8 @@ import type {
     MemorySnapshotRecord,
     MemorySourceMessage,
     MemoryUpdatePatch,
+    IdentityLinkInput,
+    IdentityLinkRecord,
     PresetSpeakerInput,
     PresetSpeakerRecord,
     UserProfileInput,
@@ -24,6 +26,7 @@ import type {
 import type {
     AttributedMemoryItem,
     DreamMemoryEntryRecord,
+    IdentityLinkRepository,
     JobRepository,
     RecallRepository,
     SnapshotRepository,
@@ -31,6 +34,7 @@ import type {
     UserProfileRepository
 } from '../../contracts/workflows'
 import { LivingMemoryEntryRepository } from './entries'
+import { FoxyIdentityLinkRepository } from './identity_links'
 import { LivingMemoryJobRepository } from './jobs'
 import {
     createActiveMemorySpeakerRows,
@@ -92,12 +96,14 @@ export class LivingMemoryRepository
         SnapshotRepository,
         JobRepository,
         UserProfileMemoryRepository,
-        UserProfileRepository
+        UserProfileRepository,
+        IdentityLinkRepository
 {
     private readonly entries: LivingMemoryEntryRepository
     private readonly jobs: LivingMemoryJobRepository
     private readonly snapshots: LivingMemorySnapshotRepository
     private readonly userProfiles: LivingMemoryUserProfileRepository
+    private readonly identityLinks: FoxyIdentityLinkRepository
     private readonly presetPersonas: LivingMemoryPresetPersonaRepository
     private readonly transactions = new SerialTaskQueue()
 
@@ -112,6 +118,9 @@ export class LivingMemoryRepository
         this.userProfiles = new LivingMemoryUserProfileRepository(
             ctx,
             (callback) => this.runTransaction(callback)
+        )
+        this.identityLinks = new FoxyIdentityLinkRepository(ctx, (callback) =>
+            this.runTransaction(callback)
         )
         this.presetPersonas = new LivingMemoryPresetPersonaRepository(ctx)
     }
@@ -409,6 +418,18 @@ export class LivingMemoryRepository
         return this.userProfiles.listUserProfilesByPreset(presetId)
     }
 
+    listIdentityLinks(presetId: string): Promise<IdentityLinkRecord[]> {
+        return this.identityLinks.listIdentityLinks(presetId)
+    }
+
+    upsertIdentityLink(input: IdentityLinkInput) {
+        return this.identityLinks.upsertIdentityLink(input)
+    }
+
+    deleteIdentityLink(id: string) {
+        return this.identityLinks.deleteIdentityLink(id)
+    }
+
     listUserProfilesBySpeakerKeys(
         presetId: string,
         speakerKeys: string[]
@@ -455,6 +476,7 @@ export class LivingMemoryRepository
             await database.remove('living_memory_job', { presetId })
             await database.remove('living_memory_user_profile', { presetId })
             await database.remove('living_memory_preset_speaker', { presetId })
+            await database.remove('foxy_identity_link', { presetId })
         })
     }
 

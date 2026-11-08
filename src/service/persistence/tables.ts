@@ -204,6 +204,29 @@ export const defineLivingMemoryTables = (ctx: Context) => {
 
     // 预设级派生缓存：一行一预设，按 presetId 直取。非备份内容，不进导出。
     ctx.model.extend(
+        'foxy_identity_link',
+        {
+            id: 'string(64)',
+            presetId: 'string(255)',
+            platform: 'string(32)',
+            platformUserId: 'string(255)',
+            canonicalSpeakerKey: 'string(255)',
+            confidence: 'double',
+            source: 'string(32)',
+            createdAt: 'timestamp',
+            updatedAt: 'timestamp'
+        },
+        {
+            autoInc: false,
+            primary: 'id',
+            indexes: [
+                ['presetId', 'platform', 'platformUserId'],
+                ['presetId', 'canonicalSpeakerKey']
+            ]
+        }
+    )
+
+    ctx.model.extend(
         'living_memory_preset_persona',
         {
             presetId: 'string(255)',

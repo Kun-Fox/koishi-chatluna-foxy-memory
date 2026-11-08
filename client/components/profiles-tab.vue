@@ -64,6 +64,13 @@
                             <el-button
                                 size="small"
                                 plain
+                                @click="openIdentityLinks(profile)"
+                            >
+                                身份合并
+                            </el-button>
+                            <el-button
+                                size="small"
+                                plain
                                 :disabled="regeneratingProfileId === profile.id"
                                 @click="editUserProfile(profile)"
                             >
@@ -103,6 +110,14 @@
             :is-dark="isDark"
             @saved="onProfileSaved"
         />
+
+        <identity-link-dialog
+            v-if="identityLinkProfile"
+            v-model="identityLinkVisible"
+            :preset-id="presetId"
+            :profile="identityLinkProfile"
+            @saved="onIdentityLinksSaved"
+        />
     </div>
 </template>
 
@@ -114,6 +129,7 @@ import { usePagedResource } from '../composables/use-paged-resource'
 import type { UserProfileRecord } from '../../src/contracts/memory'
 import { formatTime } from '../utils/display'
 import ProfileEditorDialog from './profile-editor-dialog.vue'
+import IdentityLinkDialog from './identity-link-dialog.vue'
 
 const platformLabels: Record<string, string> = {
     qq: 'QQ',
@@ -138,6 +154,8 @@ const deletingProfileId = ref<string | null>(null)
 const regeneratingProfileId = ref<string | null>(null)
 const profileDialogVisible = ref(false)
 const editingProfile = ref<UserProfileRecord | null>(null)
+const identityLinkVisible = ref(false)
+const identityLinkProfile = ref<UserProfileRecord | null>(null)
 const {
     items,
     page,
@@ -249,6 +267,15 @@ const regenerateUserProfile = async (profile: UserProfileRecord) => {
 const editUserProfile = (profile: UserProfileRecord) => {
     editingProfile.value = profile
     profileDialogVisible.value = true
+}
+
+const openIdentityLinks = (profile: UserProfileRecord) => {
+    identityLinkProfile.value = profile
+    identityLinkVisible.value = true
+}
+
+const onIdentityLinksSaved = async () => {
+    await refresh()
 }
 
 const onProfileSaved = async () => {

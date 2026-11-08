@@ -1,6 +1,7 @@
 import type {} from '@koishijs/plugin-console'
 import type {} from 'koishi-plugin-chatluna/services/chat'
 import type {
+    IdentityLinkRecord,
     LivingMemoryMigrationRecord,
     MemoryJobRecord,
     MemorySnapshotRecord,
@@ -33,6 +34,7 @@ declare module 'koishi' {
         living_memory_snapshot: MemorySnapshotRecord
         living_memory_job: MemoryJobRecord
         living_memory_user_profile: UserProfileRecord
+        foxy_identity_link: IdentityLinkRecord
         living_memory_preset_speaker: PresetSpeakerTableRecord
         living_memory_preset_persona: PresetPersonaRecord
     }

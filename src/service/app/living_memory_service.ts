@@ -28,6 +28,8 @@ import type {
     LivingMemoryPresetImportResult,
     LivingMemorySearchDetailedResult,
     LivingMemorySearchInput,
+    IdentityLinkInput,
+    IdentityLinkRecord,
     LivingMemoryTranscriptMessage,
     MemoryMutationInput,
     MemoryScope,
@@ -670,8 +672,16 @@ export class ChatLunaLivingMemoryService extends Service<LivingMemoryConfig> {
         const items = await this.repository.listUserProfilesByPreset(
             query.presetId
         )
+        const links = await this.repository.listIdentityLinks(query.presetId)
+        const linkGroups = links.map((link) => [
+            link.canonicalSpeakerKey,
+            createSpeakerKey(link.platform, link.platformUserId)
+        ])
         return filterUserProfileList(
-            mergeUserProfilesByIdentity(items, this.config.identityAliases),
+            mergeUserProfilesByIdentity(items, [
+                ...this.config.identityAliases,
+                ...linkGroups
+            ]),
             query
         )
     }
@@ -682,6 +692,18 @@ export class ChatLunaLivingMemoryService extends Service<LivingMemoryConfig> {
 
     async deleteUserProfile(profileId: string) {
         await this.repository.deleteUserProfile(profileId)
+    }
+
+    async listIdentityLinks(presetId: string): Promise<IdentityLinkRecord[]> {
+        return this.repository.listIdentityLinks(presetId)
+    }
+
+    async upsertIdentityLink(input: IdentityLinkInput) {
+        await this.repository.upsertIdentityLink(input)
+    }
+
+    async deleteIdentityLink(id: string) {
+        await this.repository.deleteIdentityLink(id)
     }
 
     async updateUserProfile(profileId: string, content: string) {

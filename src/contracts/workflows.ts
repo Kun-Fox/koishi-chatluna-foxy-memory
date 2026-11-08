@@ -1,5 +1,7 @@
 import type {
     AgenticMemorySnapshotItem,
+    IdentityLinkInput,
+    IdentityLinkRecord,
     LivingMemorySearchInput,
     LivingMemorySearchResult,
     LivingMemoryGetMessagesMemory,
@@ -265,4 +267,10 @@ export interface UserProfileRepository {
         sourceMemoryIds: string[]
     ): Promise<void>
     deleteUserProfile(profileId: string): Promise<void>
+}
+
+export interface IdentityLinkRepository {
+    listIdentityLinks(presetId: string): Promise<IdentityLinkRecord[]>
+    upsertIdentityLink(input: IdentityLinkInput): Promise<void>
+    deleteIdentityLink(id: string): Promise<void>
 }

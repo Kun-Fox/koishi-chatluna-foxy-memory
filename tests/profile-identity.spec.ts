@@ -49,6 +49,36 @@ it('merges aliased profiles into one canonical row', () => {
     assert.deepEqual(merged[0].platforms, ['qq', 'weibo'])
 })
 
+it('keeps the canonical profile label when links use speaker keys', () => {
+    const merged = mergeUserProfilesByIdentity(
+        [
+            profile({
+                id: 'qq-profile',
+                speakerKey: 'qq-key',
+                speakerLabel: 'kunfox',
+                content: 'QQ 画像',
+                sourceMemoryIds: ['memory-qq'],
+                platforms: ['qq'],
+                updatedAt: new Date('2026-01-02T00:00:00.000Z')
+            }),
+            profile({
+                id: 'weibo-profile',
+                speakerKey: 'weibo-key',
+                speakerLabel: 'nogitsune',
+                content: '微博画像',
+                sourceMemoryIds: ['memory-weibo'],
+                platforms: ['weibo'],
+                updatedAt: new Date('2026-01-03T00:00:00.000Z')
+            })
+        ],
+        ['qq-key,weibo-key']
+    )
+
+    assert.equal(merged.length, 1)
+    assert.equal(merged[0].speakerLabel, 'kunfox')
+    assert.equal(merged[0].content, '微博画像')
+})
+
 it('leaves profiles untouched without alias groups', () => {
     const input = [
         profile({ id: 'a', speakerKey: 'onebot:1' }),

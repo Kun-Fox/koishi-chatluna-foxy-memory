@@ -14,6 +14,8 @@ import type {
     PageResult
 } from '../src/contracts/rpc'
 import type {
+    IdentityLinkInput,
+    IdentityLinkRecord,
     LivingMemoryPresetExport,
     LivingMemoryPresetImportResult,
     LivingMemorySearchDetailedResult,
@@ -151,6 +153,24 @@ export async function deleteUserProfile(
     profileId: string
 ): Promise<{ success: true }> {
     return await sendLivingMemory('living-memory/deleteUserProfile', profileId)
+}
+
+export async function listIdentityLinks(
+    presetId: string
+): Promise<IdentityLinkRecord[]> {
+    return await sendLivingMemory('living-memory/listIdentityLinks', presetId)
+}
+
+export async function upsertIdentityLink(
+    input: IdentityLinkInput
+): Promise<{ success: true }> {
+    return await sendLivingMemory('living-memory/upsertIdentityLink', input)
+}
+
+export async function deleteIdentityLink(
+    id: string
+): Promise<{ success: true }> {
+    return await sendLivingMemory('living-memory/deleteIdentityLink', id)
 }
 
 export async function updateUserProfile(

@@ -42,7 +42,9 @@ export const mergeUserProfilesByIdentity = (
         ]
         return {
             ...base,
-            speakerLabel: canonical,
+            speakerLabel:
+                group.find((profile) => profile.speakerKey === canonical)
+                    ?.speakerLabel ?? canonical,
             sourceMemoryIds: sourceMemoryIds.sort(),
             platforms: platforms.sort()
         }
