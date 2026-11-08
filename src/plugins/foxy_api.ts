@@ -175,6 +175,75 @@ export function apply(ctx: Context, config: LivingMemoryConfig) {
             koa.body = { ok: true, created: ids.length, ids }
         })
 
+        ctx.server.post('/foxy-memory/list', async (koa) => {
+            const token = String(koa.headers.authorization ?? '').replace(
+                /^Bearer\s+/iu,
+                ''
+            )
+            if (!authorized(config, token, koa.req?.socket?.remoteAddress)) {
+                koa.status = 401
+                koa.body = { ok: false, error: 'unauthorized' }
+                return
+            }
+            const payload = (koa.request.body ?? {}) as {
+                presetId?: string
+                platform?: string
+                status?: 'active' | 'archived' | 'all'
+                keyword?: string
+                page?: number
+                pageSize?: number
+            }
+            const presetId = payload.presetId?.trim() || defaultPreset(config)
+            const result = await service().listMemories({
+                presetId,
+                platform: payload.platform?.trim() || undefined,
+                status: payload.status ?? 'active',
+                keyword: payload.keyword?.trim() || undefined,
+                page: Math.max(1, Number(payload.page) || 1),
+                pageSize: Math.min(100, Math.max(1, Number(payload.pageSize) || 20))
+            })
+            koa.body = { ok: true, ...result }
+        })
+
+        ctx.server.post('/foxy-memory/search', async (koa) => {
+            const token = String(koa.headers.authorization ?? '').replace(
+                /^Bearer\s+/iu,
+                ''
+            )
+            if (!authorized(config, token, koa.req?.socket?.remoteAddress)) {
+                koa.status = 401
+                koa.body = { ok: false, error: 'unauthorized' }
+                return
+            }
+            const payload = (koa.request.body ?? {}) as {
+                presetId?: string
+                query?: string
+                platform?: string
+                limit?: number
+            }
+            const query = payload.query?.trim()
+            if (!query) {
+                koa.status = 400
+                koa.body = { ok: false, error: 'query is required' }
+                return
+            }
+            const presetId = payload.presetId?.trim() || defaultPreset(config)
+            const results = await service().searchMemories(presetId, {
+                searchTexts: [query],
+                memoryTypes: ['all']
+            })
+            const memories = results.slice(
+                0,
+                Math.min(100, Math.max(1, Number(payload.limit) || 20))
+            )
+            koa.body = {
+                ok: true,
+                presetId,
+                memories,
+                text: memories.map((item) => item.content).join('\n')
+            }
+        })
+
         ctx.server.post('/foxy-memory/context', async (koa) => {
             const token = String(koa.headers.authorization ?? '').replace(
                 /^Bearer\s+/iu,

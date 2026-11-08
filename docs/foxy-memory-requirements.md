@@ -12,8 +12,8 @@
 | # | 要求 | 设计 | 当前状态 |
 |---|------|------|----------|
 | 1 | 完整保留 LivingMemory 全部功能与 Console 配置页 | 以 MIT 源码 fork 为底座，保留原服务、命令、工具、Dream、向量索引、WebUI | 源码已 fork；包名/Console 入口已改；server/client 构建与类型检查通过，功能回归待逐项 |
-| 2 | 平台筛选 + 用户匹配 | `sourceConversationId` 派生 `platform`；新增身份链接表 `foxy_identity_link` | 平台派生/筛选与身份别名注入合并已完成；画像列表按别名读取层合并；独立身份链接表未落库 |
-| 3 | 跨平台记忆整合进用户画像，画像显示来源平台 | 以 `canonicalSpeakerKey` 聚合 profile；profile 记录来源平台集合 | 画像列表/提示注入按别名合并，卡片显示来源平台；画像记录级持久合并未完成 |
+| 2 | 平台筛选 + 用户匹配 | `sourceConversationId` 派生 `platform`；新增身份链接表 `foxy_identity_link` | 平台派生/筛选、身份链接表、Repository、RPC、画像卡片“身份合并”对话框已完成；默认不自动匹配，只合并人工添加的账号 |
+| 3 | 跨平台记忆整合进用户画像，画像显示来源平台 | 以 `canonicalSpeakerKey` 聚合 profile；profile 记录来源平台集合 | 画像列表与提示注入均读取 `identity_links` 合并；卡片显示来源平台；画像记录级持久合并未完成 |
 | 4 | 预设 ID 选择保持不变 | 保留原 `presetId` 作用域 | 保留 |
 | 5 | Koishi 设置只管 QQ 侧 | 新插件不读写 `~/.dsh/foxy`；DSH 侧由 `dsh-foxy-memory` 自管 | 设计已定；代码待隔离 |
 | 6 | 更高效存储 + 全量迁移 | 保留 Koishi DB + PGlite 向量索引；新增平台/身份列与迁移任务；导出/导入校验 | 迁移设计完成；代码未完成 |
@@ -129,10 +129,10 @@ presetId, platform, platformUserId, canonicalSpeakerKey, confidence, source, cre
 - 需求矩阵/架构/风险文档；
 - 不发布、不替换旧插件。
 
-### Phase 1
-- `foxy_identity_link` 表、人工匹配 UI；
-- 平台筛选覆盖记忆/画像/任务；
-- 迁移脚本与只读校验。
+### Phase 1（当前）
+- `foxy_identity_link` 表、人工匹配 UI 已完成；
+- 画像列表与提示注入均已按人工链接合并；
+- 平台筛选覆盖记忆/画像；任务筛选与迁移/只读校验仍待完成。
 
 ### Phase 2
 - `MemoryEvent` 服务与 HTTP API；
