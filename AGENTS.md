@@ -42,6 +42,7 @@ chatluna-foxy-memory/
 │       │   ├── errors.ts                # 可由调用方修正的记忆输入错误
 │       │   ├── entry_fields.ts          # 记忆字段常量与归一化
 │       │   ├── speaker_identity.ts      # 用户身份键与昵称映射
+│       │   ├── profile_identity.ts      # 画像按身份别名读取层合并
 │       │   ├── preset_catalog.ts        # 预设目录
 │       │   ├── preset_persona.ts        # 人设卡片生成与读取
 │       │   ├── helpers.ts               # 角色名称与会话标识辅助函数

@@ -5,6 +5,7 @@ import { LivingMemoryDreamWorkerClient } from '../workflows/dream/worker/client'
 import { LivingMemoryDreamJobRunner } from '../workflows/dream/job_runner'
 import { LivingMemoryExtractor } from '../workflows/extraction/extractor'
 import { LivingMemoryMessageFormatter } from '../transcript/message_formatter'
+import { mergeUserProfilesByIdentity } from '../memory/profile_identity'
 import { LivingMemoryRepository } from '../persistence/repository'
 import {
     LivingMemoryUserProfileService,
@@ -669,7 +670,10 @@ export class ChatLunaLivingMemoryService extends Service<LivingMemoryConfig> {
         const items = await this.repository.listUserProfilesByPreset(
             query.presetId
         )
-        return filterUserProfileList(items, query)
+        return filterUserProfileList(
+            mergeUserProfilesByIdentity(items, this.config.identityAliases),
+            query
+        )
     }
 
     async listPresetSpeakers(presetId: string) {
