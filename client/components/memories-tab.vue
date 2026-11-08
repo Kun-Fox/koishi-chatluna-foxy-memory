@@ -330,7 +330,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, toRef, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, toRef, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import * as api from '../api'
 import { useMemoryList } from '../composables/use-memory-list'
@@ -426,6 +426,16 @@ watch(
         speakers.value = []
     }
 )
+
+let refreshTimer: ReturnType<typeof setInterval> | undefined
+onMounted(() => {
+    refreshTimer = setInterval(() => {
+        if (!loading.value && !document.hidden) void refreshList()
+    }, 30_000)
+})
+onUnmounted(() => {
+    if (refreshTimer) clearInterval(refreshTimer)
+})
 
 const refresh = async (resetPage = false): Promise<boolean> => {
     if (props.presetId.length === 0) {
