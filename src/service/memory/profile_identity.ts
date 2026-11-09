@@ -40,13 +40,17 @@ export const mergeUserProfilesByIdentity = (
                 group.flatMap((profile) => profile.platforms ?? [])
             )
         ]
+        const keywords = [
+            ...new Set(group.flatMap((profile) => profile.keywords ?? []))
+        ]
         return {
             ...base,
             speakerLabel:
                 group.find((profile) => profile.speakerKey === canonical)
                     ?.speakerLabel ?? canonical,
             sourceMemoryIds: sourceMemoryIds.sort(),
-            platforms: platforms.sort()
+            platforms: platforms.sort(),
+            keywords
         }
     })
 }

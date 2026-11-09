@@ -6,6 +6,7 @@ import type {
     MemoryJobRecord,
     MemorySnapshotRecord,
     PresetPersonaRecord,
+    ProfileKeywordRecord,
     UserProfileRecord
 } from './contracts/memory'
 import type { LivingMemoryConsoleEvents } from './contracts/rpc'
@@ -35,6 +36,7 @@ declare module 'koishi' {
         living_memory_snapshot: MemorySnapshotRecord
         living_memory_job: MemoryJobRecord
         living_memory_user_profile: UserProfileRecord
+        foxy_profile_keyword: ProfileKeywordRecord
         foxy_identity_link: IdentityLinkRecord
         living_memory_preset_speaker: PresetSpeakerTableRecord
         living_memory_preset_persona: PresetPersonaRecord

@@ -52,6 +52,18 @@
             >
                 {{ validationMessage }}
             </p>
+            <div class="profile-editor-field-header profile-editor-keywords-header">
+                <label for="profile-editor-keywords">关键词 / 别名</label>
+                <span>记忆内容命中时作为画像上下文注入，不会自动改写身份</span>
+            </div>
+            <el-input
+                id="profile-editor-keywords"
+                v-model="keywordsText"
+                type="textarea"
+                resize="none"
+                :autosize="{ minRows: 2, maxRows: 4 }"
+                placeholder="用逗号或换行分隔，例如：kunfox, nogitsune"
+            />
             <div class="profile-editor-actions">
                 <el-button :disabled="submitPending" @click="visible = false">
                     取消
@@ -87,6 +99,7 @@ const emit = defineEmits<{
 }>()
 
 const content = ref('')
+const keywordsText = ref('')
 const submitPending = ref(false)
 const contentInput = ref<{ focus: () => void } | null>(null)
 
@@ -97,6 +110,17 @@ const visible = computed({
 
 const normalizedContent = computed(() => content.value.trim())
 const originalContent = computed(() => props.profile?.content.trim() ?? '')
+const normalizedKeywords = computed(() =>
+    [
+        ...new Set(
+            keywordsText.value
+                .split(/[,，\n]/)
+                .map((keyword) => keyword.trim())
+                .filter((keyword) => keyword.length >= 2)
+        )
+    ].slice(0, 20)
+)
+const originalKeywords = computed(() => props.profile?.keywords ?? [])
 const profileInitial = computed(
     () => Array.from(props.profile?.speakerLabel.trim() || '用')[0]
 )
@@ -106,11 +130,17 @@ const validationMessage = computed(() => {
     }
     return ''
 })
+const keywordsChanged = computed(
+    () =>
+        normalizedKeywords.value.join('\u0000') !==
+        originalKeywords.value.join('\u0000')
+)
 const canSubmit = computed(
     () =>
         props.profile != null &&
         validationMessage.value.length === 0 &&
-        normalizedContent.value !== originalContent.value &&
+        (normalizedContent.value !== originalContent.value ||
+            keywordsChanged.value) &&
         !submitPending.value
 )
 
@@ -127,7 +157,16 @@ const submit = async () => {
 
     submitPending.value = true
     try {
-        await api.updateUserProfile(profile.id, normalizedContent.value)
+        if (normalizedContent.value !== originalContent.value) {
+            await api.updateUserProfile(profile.id, normalizedContent.value)
+        }
+        if (keywordsChanged.value) {
+            await api.updateProfileKeywords(
+                profile.presetId,
+                profile.speakerKey,
+                normalizedKeywords.value
+            )
+        }
         ElMessage.success('用户画像已更新')
         visible.value = false
         emit('saved')
@@ -144,6 +183,7 @@ watch(
     ([isVisible]) => {
         if (isVisible) {
             content.value = props.profile?.content ?? ''
+            keywordsText.value = (props.profile?.keywords ?? []).join(', ')
         }
     },
     { immediate: true }

@@ -170,6 +170,23 @@ export const defineLivingMemoryTables = (ctx: Context) => {
     )
 
     ctx.model.extend(
+        'foxy_profile_keyword',
+        {
+            id: 'string(64)',
+            presetId: 'string(255)',
+            speakerKey: 'string(255)',
+            keyword: 'string(255)',
+            createdAt: 'timestamp',
+            updatedAt: 'timestamp'
+        },
+        {
+            autoInc: false,
+            primary: 'id',
+            indexes: [['presetId', 'speakerKey']]
+        }
+    )
+
+    ctx.model.extend(
         'living_memory_preset_speaker',
         {
             id: 'string(64)',

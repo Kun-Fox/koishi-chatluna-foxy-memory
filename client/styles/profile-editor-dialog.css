@@ -129,3 +129,6 @@
         flex: 1;
     }
 }
+
+.profile-editor-keywords-header { margin-top: 18px; }
+.profile-editor-keywords-header span { color: var(--lm-text-muted); font-size: 12px; font-weight: 400; }

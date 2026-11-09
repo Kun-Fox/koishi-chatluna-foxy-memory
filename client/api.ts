@@ -184,6 +184,19 @@ export async function updateUserProfile(
     )
 }
 
+export async function updateProfileKeywords(
+    presetId: string,
+    speakerKey: string,
+    keywords: string[]
+): Promise<{ success: true }> {
+    return await sendLivingMemory(
+        'living-memory/updateProfileKeywords',
+        presetId,
+        speakerKey,
+        keywords
+    )
+}
+
 export async function regenerateUserProfile(
     presetId: string,
     speakerKey: string

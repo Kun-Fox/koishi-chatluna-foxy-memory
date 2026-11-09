@@ -468,6 +468,22 @@ export class LivingMemoryRepository
         return this.userProfiles.deleteUserProfile(profileId)
     }
 
+    listProfileKeywords(presetId: string) {
+        return this.userProfiles.listProfileKeywords(presetId)
+    }
+
+    replaceProfileKeywords(
+        presetId: string,
+        speakerKey: string,
+        keywords: string[]
+    ) {
+        return this.userProfiles.replaceProfileKeywords(
+            presetId,
+            speakerKey,
+            keywords
+        )
+    }
+
     async clearAllByPreset(presetId: string) {
         await this.runTransaction(async (database) => {
             await database.remove('living_memory_entry', { presetId })

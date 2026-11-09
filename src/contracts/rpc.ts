@@ -125,6 +125,11 @@ export interface LivingMemoryConsoleEvents {
     'living-memory/resetPresetPersonaCard': (
         presetId: string
     ) => Promise<{ success: true }>
+    'living-memory/updateProfileKeywords': (
+        presetId: string,
+        speakerKey: string,
+        keywords: string[]
+    ) => Promise<{ success: true }>
     'living-memory/listPresetSpeakers': (
         presetId: string
     ) => Promise<PresetSpeakerRecord[]>

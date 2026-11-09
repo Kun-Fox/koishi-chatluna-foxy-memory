@@ -42,6 +42,16 @@
                         {{ profile.content }}
                     </p>
 
+                    <div v-if="profile.keywords?.length" class="profile-keywords">
+                        <span
+                            v-for="keyword in profile.keywords"
+                            :key="keyword"
+                            class="profile-keyword"
+                        >
+                            # {{ keyword }}
+                        </span>
+                    </div>
+
                     <div class="profile-card-footer">
                         <div class="profile-card-meta">
                             <span>

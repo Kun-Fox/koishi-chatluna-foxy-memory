@@ -16,6 +16,7 @@ import type {
     MemorySourceMessage,
     PresetSpeakerInput,
     PresetSpeakerRecord,
+    ProfileKeywordRecord,
     UserProfileInput,
     UserProfileRecord
 } from './memory'
@@ -269,6 +270,12 @@ export interface UserProfileRepository {
         sourceMemoryIds: string[]
     ): Promise<void>
     deleteUserProfile(profileId: string): Promise<void>
+    listProfileKeywords(presetId: string): Promise<ProfileKeywordRecord[]>
+    replaceProfileKeywords(
+        presetId: string,
+        speakerKey: string,
+        keywords: string[]
+    ): Promise<void>
 }
 
 export interface IdentityLinkRepository {

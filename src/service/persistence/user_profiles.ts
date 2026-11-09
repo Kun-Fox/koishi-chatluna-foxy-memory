@@ -4,6 +4,7 @@ import type {
     MemoryEntryRecord,
     PresetSpeakerInput,
     PresetSpeakerRecord,
+    ProfileKeywordRecord,
     UserProfileInput,
     UserProfileRecord
 } from '../../contracts/memory'
@@ -26,6 +27,20 @@ const compareProfilesByCanonicalOrder = (
 const uniquePlatforms = (values: Array<string | null | undefined>) => [
     ...new Set(values.filter((value): value is string => Boolean(value)))
 ]
+
+const normalizeKeywords = (values: string[] | undefined) => {
+    const seen = new Set<string>()
+    const result: string[] = []
+    for (const value of values ?? []) {
+        const keyword = String(value ?? '').trim()
+        const key = keyword.toLocaleLowerCase()
+        if (keyword.length < 2 || seen.has(key)) continue
+        seen.add(key)
+        result.push(keyword)
+        if (result.length >= 20) break
+    }
+    return result
+}
 
 export class LivingMemoryUserProfileRepository implements UserProfileRepository {
     constructor(
@@ -173,6 +188,26 @@ export class LivingMemoryUserProfileRepository implements UserProfileRepository 
         }))
     }
 
+    private async attachKeywords(
+        profiles: UserProfileRecord[]
+    ): Promise<UserProfileRecord[]> {
+        if (profiles.length === 0) return profiles
+        const presetId = profiles[0].presetId
+        const rows = await this.ctx.database.get('foxy_profile_keyword', {
+            presetId
+        })
+        const keywordMap = new Map<string, string[]>()
+        for (const row of rows as ProfileKeywordRecord[]) {
+            const current = keywordMap.get(row.speakerKey) ?? []
+            current.push(row.keyword)
+            keywordMap.set(row.speakerKey, current)
+        }
+        return profiles.map((profile) => ({
+            ...profile,
+            keywords: normalizeKeywords(keywordMap.get(profile.speakerKey))
+        }))
+    }
+
     async listUserProfilesByPreset(
         presetId: string
     ): Promise<UserProfileRecord[]> {
@@ -182,7 +217,11 @@ export class LivingMemoryUserProfileRepository implements UserProfileRepository 
         )
 
         return (
-            await this.attachPlatforms(profiles.map(normalizeUserProfileRecord))
+            await this.attachKeywords(
+                await this.attachPlatforms(
+                    profiles.map(normalizeUserProfileRecord)
+                )
+            )
         ).sort((left, right) =>
             left.speakerLabel.localeCompare(right.speakerLabel)
         )
@@ -210,7 +249,11 @@ export class LivingMemoryUserProfileRepository implements UserProfileRepository 
         // 同一 speakerKey 可能残留重复行，规范行的口径必须与
         // replaceUserProfile 的写入目标一致，否则读到的画像不是最后写入的那行。
         return (
-            await this.attachPlatforms(profiles.map(normalizeUserProfileRecord))
+            await this.attachKeywords(
+                await this.attachPlatforms(
+                    profiles.map(normalizeUserProfileRecord)
+                )
+            )
         ).sort(compareProfilesByCanonicalOrder)
     }
 
@@ -284,6 +327,41 @@ export class LivingMemoryUserProfileRepository implements UserProfileRepository 
     async deleteUserProfile(profileId: string) {
         await this.ctx.database.remove('living_memory_user_profile', {
             id: profileId
+        })
+    }
+
+    async listProfileKeywords(presetId: string): Promise<ProfileKeywordRecord[]> {
+        return (await this.ctx.database.get('foxy_profile_keyword', {
+            presetId
+        })) as ProfileKeywordRecord[]
+    }
+
+    async replaceProfileKeywords(
+        presetId: string,
+        speakerKey: string,
+        keywords: string[]
+    ) {
+        const normalizedPreset = presetId.trim()
+        const normalizedSpeaker = speakerKey.trim()
+        if (!normalizedPreset || !normalizedSpeaker) return
+        const normalized = normalizeKeywords(keywords)
+        await this.transact(async (database) => {
+            await database.remove('foxy_profile_keyword', {
+                presetId: normalizedPreset,
+                speakerKey: normalizedSpeaker
+            })
+            if (normalized.length === 0) return
+            const now = new Date()
+            for (const keyword of normalized) {
+                await database.create('foxy_profile_keyword', {
+                    id: randomUUID(),
+                    presetId: normalizedPreset,
+                    speakerKey: normalizedSpeaker,
+                    keyword,
+                    createdAt: now,
+                    updatedAt: now
+                })
+            }
         })
     }
 }

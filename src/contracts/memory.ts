@@ -183,6 +183,16 @@ export interface UserProfileRecord {
     content: string
     sourceMemoryIds: string[]
     platforms?: string[]
+    keywords?: string[]
+    createdAt: Date
+    updatedAt: Date
+}
+
+export interface ProfileKeywordRecord {
+    id: string
+    presetId: string
+    speakerKey: string
+    keyword: string
     createdAt: Date
     updatedAt: Date
 }

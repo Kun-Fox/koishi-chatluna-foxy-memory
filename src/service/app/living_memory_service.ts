@@ -689,6 +689,47 @@ export class ChatLunaLivingMemoryService extends Service<LivingMemoryConfig> {
         )
     }
 
+    async matchProfilesByKeywords(
+        presetId: string,
+        text: string,
+        limit = 3
+    ) {
+        const haystack = String(text ?? '').toLocaleLowerCase()
+        if (!haystack.trim()) return []
+        const page = await this.listUserProfiles({
+            presetId,
+            page: 1,
+            pageSize: 1000
+        })
+        return page.items
+            .map((profile) => {
+                const matchedKeywords = (profile.keywords ?? []).filter(
+                    (keyword) =>
+                        keyword.length >= 2 &&
+                        haystack.includes(keyword.toLocaleLowerCase())
+                )
+                return { ...profile, matchedKeywords }
+            })
+            .filter((profile) => profile.matchedKeywords.length > 0)
+            .sort(
+                (left, right) =>
+                    right.matchedKeywords.length - left.matchedKeywords.length
+            )
+            .slice(0, Math.max(0, Math.min(10, limit)))
+    }
+
+    async updateUserProfileKeywords(
+        presetId: string,
+        speakerKey: string,
+        keywords: string[]
+    ) {
+        await this.repository.replaceProfileKeywords(
+            presetId,
+            speakerKey,
+            keywords
+        )
+    }
+
     async listPresetSpeakers(presetId: string) {
         return await this.repository.listPresetSpeakers(presetId)
     }

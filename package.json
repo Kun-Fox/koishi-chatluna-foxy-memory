@@ -1,113 +1,113 @@
 {
-    "name": "koishi-plugin-chatluna-foxy-memory",
-    "version": "0.2.2",
-    "contributors": [
-        "Kun-Fox",
-        "ProcyonNAN <3189960265@qq.com>"
-    ],
-    "repository": {
-        "type": "git",
-        "url": "git+https://github.com/Kun-Fox/koishi-plugin-chatluna-foxy-memory.git"
+  "name": "koishi-plugin-chatluna-foxy-memory",
+  "version": "0.2.3",
+  "contributors": [
+    "Kun-Fox",
+    "ProcyonNAN <3189960265@qq.com>"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Kun-Fox/koishi-plugin-chatluna-foxy-memory.git"
+  },
+  "type": "module",
+  "description": "Foxy 的跨平台长期记忆：兼容并扩展 chatluna-livingmemory，支持平台来源、用户身份匹配与 DSH 记忆适配。",
+  "main": "lib/index.cjs",
+  "module": "lib/index.mjs",
+  "typings": "lib/index.d.ts",
+  "files": [
+    "lib",
+    "dist",
+    "client",
+    "src/contracts",
+    "src/service/memory/entry_fields.ts",
+    "resources"
+  ],
+  "exports": {
+    ".": {
+      "types": "./lib/index.d.ts",
+      "import": "./lib/index.mjs",
+      "require": "./lib/index.cjs"
     },
-    "type": "module",
-    "description": "Foxy 的跨平台长期记忆：兼容并扩展 chatluna-livingmemory，支持平台来源、用户身份匹配与 DSH 记忆适配。",
-    "main": "lib/index.cjs",
-    "module": "lib/index.mjs",
-    "typings": "lib/index.d.ts",
-    "files": [
-        "lib",
-        "dist",
-        "client",
-        "src/contracts",
-        "src/service/memory/entry_fields.ts",
-        "resources"
-    ],
-    "exports": {
-        ".": {
-            "types": "./lib/index.d.ts",
-            "import": "./lib/index.mjs",
-            "require": "./lib/index.cjs"
-        },
-        "./package.json": "./package.json"
-    },
-    "license": "MIT",
-    "keywords": [
-        "chatluna",
-        "koishi",
-        "plugin",
-        "memory"
-    ],
-    "dependencies": {
-        "@electric-sql/pglite": "0.5.11",
-        "@electric-sql/pglite-pgvector": "0.0.12",
-        "@langchain/core": "^0.3.80",
-        "zod": "3.25.76"
-    },
-    "resolutions": {
-        "js-tiktoken": "npm:@dingyi222666/js-tiktoken@^1.0.21"
-    },
+    "./package.json": "./package.json"
+  },
+  "license": "MIT",
+  "keywords": [
+    "chatluna",
+    "koishi",
+    "plugin",
+    "memory"
+  ],
+  "dependencies": {
+    "@electric-sql/pglite": "0.5.11",
+    "@electric-sql/pglite-pgvector": "0.0.12",
+    "@langchain/core": "^0.3.80",
+    "zod": "3.25.76"
+  },
+  "resolutions": {
+    "js-tiktoken": "npm:@dingyi222666/js-tiktoken@^1.0.21"
+  },
+  "overrides": {
+    "js-tiktoken": "npm:@dingyi222666/js-tiktoken@^1.0.21"
+  },
+  "pnpm": {
     "overrides": {
-        "js-tiktoken": "npm:@dingyi222666/js-tiktoken@^1.0.21"
-    },
-    "pnpm": {
-        "overrides": {
-            "js-tiktoken": "npm:@dingyi222666/js-tiktoken@^1.0.21"
-        }
-    },
-    "devDependencies": {
-        "@koishijs/client": "^5.30.11",
-        "@koishijs/plugin-console": "^5.30.11",
-        "@koishijs/plugin-database-sqlite": "^4.7.0",
-        "atsc": "^2.1.0",
-        "esbuild": "^0.28.2",
-        "esbuild-register": "^3.6.0",
-        "koishi": "^4.18.11",
-        "koishi-plugin-chatluna": "^1.4.0-alpha.44",
-        "oxfmt": "^0.65.0",
-        "oxlint": "^1.80.0",
-        "oxlint-tsgolint": "^7.0.2001",
-        "typescript": "^7.0.2",
-        "vitest": "^4.1.11",
-        "yakumo": "^3.2.1",
-        "yakumo-esbuild": "^3.0.2",
-        "yakumo-tsc": "^3.0.1"
-    },
-    "peerDependencies": {
-        "@koishijs/plugin-console": "^5.30.11",
-        "koishi": "^4.18.9",
-        "koishi-plugin-chatluna": "^1.4.0-alpha.37"
-    },
-    "engines": {
-        "node": ">=22.13.0"
-    },
-    "scripts": {
-        "build:server": "yakumo build && node --run build:workers",
-        "build:workers": "node scripts/build-workers.mjs",
-        "build:client": "koishi-console build",
-        "build": "node --run build:server && node --run build:client",
-        "test": "vitest run",
-        "bump": "yakumo version",
-        "dep": "yakumo upgrade",
-        "pub": "yakumo publish",
-        "lint": "oxlint && oxfmt --check",
-        "lint-fix": "oxlint --fix && oxfmt"
-    },
-    "koishi": {
-        "description": {
-            "zh": "Foxy 的跨平台长期记忆：平台来源、用户身份匹配、DSH 适配与热更新。",
-            "en": "Cross-platform long-term memory for Foxy: platform origins, identity matching, DSH adapters, and hot reload."
-        },
-        "service": {
-            "required": [
-                "chatluna",
-                "database"
-            ],
-            "optional": [
-                "console",
-                "chatluna_character"
-            ]
-        },
-        "browser": true,
-        "icon": "mdi:brain"
+      "js-tiktoken": "npm:@dingyi222666/js-tiktoken@^1.0.21"
     }
+  },
+  "devDependencies": {
+    "@koishijs/client": "^5.30.11",
+    "@koishijs/plugin-console": "^5.30.11",
+    "@koishijs/plugin-database-sqlite": "^4.7.0",
+    "atsc": "^2.1.0",
+    "esbuild": "^0.28.2",
+    "esbuild-register": "^3.6.0",
+    "koishi": "^4.18.11",
+    "koishi-plugin-chatluna": "^1.4.0-alpha.44",
+    "oxfmt": "^0.65.0",
+    "oxlint": "^1.80.0",
+    "oxlint-tsgolint": "^7.0.2001",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.11",
+    "yakumo": "^3.2.1",
+    "yakumo-esbuild": "^3.0.2",
+    "yakumo-tsc": "^3.0.1"
+  },
+  "peerDependencies": {
+    "@koishijs/plugin-console": "^5.30.11",
+    "koishi": "^4.18.9",
+    "koishi-plugin-chatluna": "^1.4.0-alpha.37"
+  },
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "build:server": "yakumo build && node --run build:workers",
+    "build:workers": "node scripts/build-workers.mjs",
+    "build:client": "koishi-console build",
+    "build": "node --run build:server && node --run build:client",
+    "test": "vitest run",
+    "bump": "yakumo version",
+    "dep": "yakumo upgrade",
+    "pub": "yakumo publish",
+    "lint": "oxlint && oxfmt --check",
+    "lint-fix": "oxlint --fix && oxfmt"
+  },
+  "koishi": {
+    "description": {
+      "zh": "Foxy 的跨平台长期记忆：平台来源、用户身份匹配、DSH 适配与热更新。",
+      "en": "Cross-platform long-term memory for Foxy: platform origins, identity matching, DSH adapters, and hot reload."
+    },
+    "service": {
+      "required": [
+        "chatluna",
+        "database"
+      ],
+      "optional": [
+        "console",
+        "chatluna_character"
+      ]
+    },
+    "browser": true,
+    "icon": "mdi:brain"
+  }
 }

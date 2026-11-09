@@ -380,10 +380,29 @@ export function apply(ctx: Context, config: LivingMemoryConfig) {
                 conversationId
             )
             const memories = results.slice(0, payload.limit ?? 10)
+            const profiles = await service().matchProfilesByKeywords(
+                presetId,
+                query,
+                3
+            )
+            const profileText = profiles
+                .map(
+                    (profile) =>
+                        `[画像 ${profile.speakerLabel}｜关键词 ${profile.matchedKeywords.join('、')}] ${profile.content.slice(0, 400)}`
+                )
+                .join('\n')
             koa.body = {
                 ok: true,
                 presetId,
-                text: memories.map((item) => item.content).join('\n'),
+                text: [profileText, ...memories.map((item) => item.content)]
+                    .filter(Boolean)
+                    .join('\n'),
+                profiles: profiles.map((profile) => ({
+                    speakerKey: profile.speakerKey,
+                    speakerLabel: profile.speakerLabel,
+                    matchedKeywords: profile.matchedKeywords,
+                    content: profile.content
+                })),
                 memories
             }
         })
