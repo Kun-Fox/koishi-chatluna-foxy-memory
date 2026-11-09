@@ -41,6 +41,24 @@ npm run build
 
 启用后，在 Koishi Console 左侧进入 **Foxy Memory** 页面。命令行入口为 `foxy-memory`；旧服务名仅作为兼容别名保留。
 
+### 在预设中加入记忆变量
+
+本插件只提供记忆服务，不替换 ChatLuna 或 Character 的预设。记忆不是通过 URL 写进预设，而是通过预设变量注入：
+
+- **ChatLuna**：主对话由插件在 `before-chat` 自动注入记忆，预设里不需要额外变量。
+- **Character**：在预设的 system / prompt 文本中加入 `{living_memory}`，插件会把本轮的长期记忆和用户画像替换到这个位置。推荐放在人设之后、当前对话之前：
+
+```yaml
+persona: |
+  你是 Foxy……
+
+  {living_memory}
+
+  以下是当前对话：
+```
+
+`{living_memory}` 是变量占位符，不是 HTTP 地址，也不是本机端口。DSH 侧的 `bridgeUrl` 才填写 `http://127.0.0.1:5140/foxy-memory`；两者不要混淆。Character 预设即使没有这个变量，插件也会在 `before-chat` 准备上下文，但显式加入变量才能控制注入位置，也更便于排查。
+
 ## 配置
 
 模型、提取、召回、Dream、用户画像、工具、白名单等配置沿用 LivingMemory 的完整 Schema；平台筛选、身份合并、DSH HTTP API 与迁移导入导出已加入当前版本。
