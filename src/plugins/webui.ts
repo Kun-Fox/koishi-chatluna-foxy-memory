@@ -36,7 +36,10 @@ function resolveEntryPaths(ctx: Context) {
 }
 
 const service = (ctx: Context): ChatLunaLivingMemoryService => {
-    return ctx.chatluna_living_memory
+    return (
+        ctx.get('chatluna_living_memory') ??
+        ctx.chatluna_living_memory
+    ) as ChatLunaLivingMemoryService
 }
 
 const ok = <T extends unknown[]>(fn: (...args: T) => Promise<void>) => {
