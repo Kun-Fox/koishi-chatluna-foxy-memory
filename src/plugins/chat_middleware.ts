@@ -26,7 +26,7 @@ const registerConversationLog = (
     session: Session,
     conversationId: string
 ) => {
-    ctx.chatluna_living_memory.messageLog.register(conversationId, {
+    ctx.chatluna_foxy_memory.messageLog.register(conversationId, {
         platform: session.platform,
         channelId: session.channelId ?? session.userId ?? '',
         guildId: session.guildId ?? undefined,
@@ -108,7 +108,7 @@ interface ChatPresetSource {
 }
 
 export async function apply(ctx: Context, config: LivingMemoryConfig) {
-    const livingMemory = ctx.chatluna_living_memory
+    const livingMemory = ctx.chatluna_foxy_memory
     const logger = livingMemory.memoryLogger.with({
         workflow: 'chat'
     })

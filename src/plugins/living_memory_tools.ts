@@ -56,31 +56,31 @@ export function apply(ctx: Context, config: LivingMemoryConfig) {
 
         register(memorySearchTool, ['search'], () =>
             createMemoryTool.search(
-                ctx.chatluna_living_memory,
+                ctx.chatluna_foxy_memory,
                 true,
                 config.enableConversationIsolation
             )
         )
         register(memoryGetMessagesTool, ['source', 'messages'], () =>
-            createMemoryTool.getMessages(ctx.chatluna_living_memory)
+            createMemoryTool.getMessages(ctx.chatluna_foxy_memory)
         )
         register(memoryCreateTool, ['create', 'write'], () =>
             createMemoryTool.create(
-                ctx.chatluna_living_memory,
+                ctx.chatluna_foxy_memory,
                 config.memoryCreateToolMaxMemories
             )
         )
         register(memoryUpdateTool, ['update', 'write'], () =>
-            createMemoryTool.update(ctx.chatluna_living_memory)
+            createMemoryTool.update(ctx.chatluna_foxy_memory)
         )
         register(memoryMergeTool, ['merge', 'write'], () =>
-            createMemoryTool.merge(ctx.chatluna_living_memory)
+            createMemoryTool.merge(ctx.chatluna_foxy_memory)
         )
         register(memorySplitTool, ['split', 'write'], () =>
-            createMemoryTool.split(ctx.chatluna_living_memory)
+            createMemoryTool.split(ctx.chatluna_foxy_memory)
         )
         register(memoryDeleteTool, ['delete', 'write'], () =>
-            createMemoryTool.delete(ctx.chatluna_living_memory)
+            createMemoryTool.delete(ctx.chatluna_foxy_memory)
         )
 
         ctx.effect(() => () => {

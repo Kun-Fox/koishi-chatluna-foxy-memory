@@ -110,7 +110,7 @@ const createCharacterScope = (
     context: CharacterChatContext,
     speakerId: string | undefined
 ) => {
-    return ctx.chatluna_living_memory.createScope(
+    return ctx.chatluna_foxy_memory.createScope(
         context.sessionKey,
         toCharacterMemoryPresetId(context.presetName),
         speakerId,
@@ -154,7 +154,7 @@ const registerConversationLog = (
     session: Session,
     conversationId: string
 ) => {
-    ctx.chatluna_living_memory.messageLog.register(
+    ctx.chatluna_foxy_memory.messageLog.register(
         conversationId,
         {
             platform: session.platform,
@@ -220,11 +220,11 @@ const buildCharacterReplyEntries = (
 }
 
 export async function apply(ctx: Context, config: LivingMemoryConfig) {
-    const logger = ctx.chatluna_living_memory.memoryLogger.with({
+    const logger = ctx.chatluna_foxy_memory.memoryLogger.with({
         workflow: 'character'
     })
     const events = ctx as unknown as CharacterEventRegistrar
-    const livingMemory = ctx.chatluna_living_memory
+    const livingMemory = ctx.chatluna_foxy_memory
     const character = (
         ctx as unknown as {
             chatluna_character: CharacterReceptionService
@@ -427,7 +427,7 @@ export async function apply(ctx: Context, config: LivingMemoryConfig) {
                         ? collectUserProfileSpeakerKeys(messages)
                         : []
                     const sections =
-                        await ctx.chatluna_living_memory.hydratePromptSections(
+                        await ctx.chatluna_foxy_memory.hydratePromptSections(
                             scope,
                             {
                                 speakerKeys
@@ -472,12 +472,12 @@ export async function apply(ctx: Context, config: LivingMemoryConfig) {
                 }))
                 return
             }
-            await ctx.chatluna_living_memory.recordPresetSpeaker(
+            await ctx.chatluna_foxy_memory.recordPresetSpeaker(
                 scope,
                 currentMessage.speakerLabel
             )
 
-            await ctx.chatluna_living_memory.queueRecall(
+            await ctx.chatluna_foxy_memory.queueRecall(
                 scope,
                 currentMessage,
                 async () => history
@@ -515,7 +515,7 @@ export async function apply(ctx: Context, config: LivingMemoryConfig) {
     events.on(
         'chatluna_character/clear-chat-history',
         async (payload: CharacterClearChatHistoryEventPayload) => {
-            await ctx.chatluna_living_memory.cleanupConversation(
+            await ctx.chatluna_foxy_memory.cleanupConversation(
                 payload.sessionKey
             )
             logger.diagnosticSummary(() => ({

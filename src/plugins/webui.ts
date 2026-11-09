@@ -37,8 +37,8 @@ function resolveEntryPaths(ctx: Context) {
 
 const service = (ctx: Context): ChatLunaLivingMemoryService => {
     return (
-        ctx.get('chatluna_living_memory') ??
-        ctx.chatluna_living_memory
+        ctx.get('chatluna_foxy_memory') ??
+        ctx.chatluna_foxy_memory
     ) as ChatLunaLivingMemoryService
 }
 

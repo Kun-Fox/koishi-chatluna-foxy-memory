@@ -18,15 +18,19 @@ export type Config = LivingMemoryConfig
 export function apply(ctx: Context, config: Config) {
     ctx.plugin(ChatLunaLivingMemoryService, config)
 
+    ctx.inject(['chatluna_foxy_memory'], (ctx) => {
+        ctx.set('chatluna_living_memory', ctx.chatluna_foxy_memory)
+    })
+
     ctx.inject(['console'], (ctx) => {
         registerWebUIEntry(ctx)
 
-        ctx.inject(['chatluna_living_memory'], (ctx) => {
+        ctx.inject(['chatluna_foxy_memory'], (ctx) => {
             webuiPlugin(ctx, config)
         })
     })
 
-    ctx.inject(['chatluna_living_memory'], (ctx) => {
+    ctx.inject(['chatluna_foxy_memory'], (ctx) => {
         livingMemoryCommandsPlugin(ctx)
         if (config.foxyApiEnabled) {
             foxyApiPlugin(ctx, config)

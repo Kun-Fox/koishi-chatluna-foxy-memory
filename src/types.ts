@@ -24,7 +24,8 @@ export type { QueueExtractionOptions } from './service/memory/helpers'
 
 declare module 'koishi' {
     interface Context {
-        chatluna_living_memory: ChatLunaLivingMemoryService
+        chatluna_foxy_memory: ChatLunaLivingMemoryService
+        chatluna_living_memory?: ChatLunaLivingMemoryService
     }
 
     interface Tables {

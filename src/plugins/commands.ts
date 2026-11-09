@@ -3,7 +3,7 @@ import { toCharacterMemoryPresetId } from '../service/memory/helpers'
 
 export function apply(ctx: Context) {
     ctx.command(
-        'livingmemory <preset:string> [operation:string] [filter:string] [value:text]',
+        'foxy-memory <preset:string> [operation:string] [filter:string] [value:text]',
         '管理指定预设下的记忆与用户画像',
         { authority: 3 }
     )
@@ -34,7 +34,7 @@ export function apply(ctx: Context) {
                     resolvedValue == null ||
                     selectedFilters.length > 1
                 ) {
-                    return '命令格式：livingmemory [-c] <预设名> delete <text|user|profile> <匹配值>\n简写：livingmemory [-c] <预设名> -d -<t|u|p> <匹配值>'
+                    return '命令格式：foxy-memory [-c] <预设名> delete <text|user|profile> <匹配值>\n简写：foxy-memory [-c] <预设名> -d -<t|u|p> <匹配值>'
                 }
 
                 const presetId = options?.character
@@ -43,7 +43,7 @@ export function apply(ctx: Context) {
 
                 if (resolvedFilter === 'profile') {
                     const profileId =
-                        await ctx.chatluna_living_memory.findUserProfileIdByUser(
+                        await ctx.chatluna_foxy_memory.findUserProfileIdByUser(
                             presetId,
                             commandSession.platform,
                             resolvedValue
@@ -63,7 +63,7 @@ export function apply(ctx: Context) {
                         return '操作取消'
                     }
 
-                    await ctx.chatluna_living_memory.deleteUserProfile(
+                    await ctx.chatluna_foxy_memory.deleteUserProfile(
                         profileId
                     )
                     return '已删除用户画像'
@@ -72,13 +72,13 @@ export function apply(ctx: Context) {
                 let memoryIds: string[]
                 if (resolvedFilter === 'text') {
                     memoryIds =
-                        await ctx.chatluna_living_memory.findActiveMemoryIdsByText(
+                        await ctx.chatluna_foxy_memory.findActiveMemoryIdsByText(
                             presetId,
                             resolvedValue
                         )
                 } else {
                     memoryIds =
-                        await ctx.chatluna_living_memory.findActiveMemoryIdsByUser(
+                        await ctx.chatluna_foxy_memory.findActiveMemoryIdsByUser(
                             presetId,
                             commandSession.platform,
                             resolvedValue
@@ -101,7 +101,7 @@ export function apply(ctx: Context) {
                 }
 
                 const result =
-                    await ctx.chatluna_living_memory.archiveActiveMemories(
+                    await ctx.chatluna_foxy_memory.archiveActiveMemories(
                         presetId,
                         memoryIds
                     )

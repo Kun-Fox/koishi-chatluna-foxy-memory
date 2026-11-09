@@ -94,7 +94,7 @@ const prefix = (payload: RecordPayload, text: string) => {
 export function apply(ctx: Context, config: LivingMemoryConfig) {
     ctx.inject(['server'], (ctx) => {
         const service = (): ChatLunaLivingMemoryService =>
-            ctx.chatluna_living_memory
+            ctx.chatluna_foxy_memory
 
         ctx.server.get('/foxy-memory/health', async (koa: any) => {
             koa.body = {

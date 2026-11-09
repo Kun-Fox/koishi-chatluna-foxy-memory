@@ -98,9 +98,9 @@ export class ChatLunaLivingMemoryService extends Service<LivingMemoryConfig> {
         public readonly ctx: Context,
         public config: LivingMemoryConfig
     ) {
-        super(ctx, 'chatluna_living_memory', true)
+        super(ctx, 'chatluna_foxy_memory', true)
         this.memoryLogger = new LivingMemoryLogger(
-            ctx.logger('chatluna-livingmemory'),
+            ctx.logger('foxy-memory'),
             () => this.config.debug
         )
         this.messageLog = new MessageLogRegistry()
