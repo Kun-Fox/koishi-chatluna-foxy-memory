@@ -39,7 +39,7 @@ npm install
 npm run build
 ```
 
-启用后，在 Koishi Console 左侧进入 **Foxy Memory** 页面。原 LivingMemory 页面路径/命令仍保留兼容。
+启用后，在 Koishi Console 左侧进入 **Foxy Memory** 页面。命令行入口为 `foxy-memory`；旧服务名仅作为兼容别名保留。
 
 ## 配置
 

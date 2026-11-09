@@ -74,7 +74,7 @@
             <el-card shadow="never" class="toolbar-card">
                 <template #header>
                     <div class="toolbar-header">
-                        <span class="toolbar-title">Living Memory</span>
+                        <span class="toolbar-title">Foxy Memory</span>
                     </div>
                 </template>
 
