@@ -78,6 +78,15 @@
                     </div>
                 </template>
 
+                <el-alert
+                    v-if="presetLoadError"
+                    class="preset-load-error"
+                    :title="presetLoadError"
+                    type="warning"
+                    :closable="false"
+                    show-icon
+                />
+
                 <div class="toolbar-grid">
                     <div class="filter-group-horizontal">
                         <span class="field-label-inline">预设 ID</span>
@@ -372,8 +381,10 @@ const clearPresetTarget = ref('')
 const editingMemory = ref<MemoryEntryRecord | null>(null)
 const importFileInput = ref<HTMLInputElement | null>(null)
 
+const PRESET_STORAGE_KEY = 'foxy-memory:preset-id'
 const presetId = ref('')
 const presetIds = ref<string[]>([])
+const presetLoadError = ref('')
 const configWarnings = ref<MemoryConfigWarning[]>([])
 const vectorIndexStatus = ref<MemoryVectorIndexStatus | null>(null)
 const importedPresetAwaitingIndex = ref('')
@@ -527,11 +538,31 @@ const fetchConfigStatus = async () => {
     }
 }
 
+const preferredPreset = () => {
+    const saved = window.localStorage.getItem(PRESET_STORAGE_KEY)?.trim()
+    if (saved && presetIds.value.includes(saved)) {
+        return saved
+    }
+    return (
+        presetIds.value.find((id) => id === 'foxy3（Character）') ??
+        presetIds.value[0] ??
+        ''
+    )
+}
+
 const fetchPresetIds = async () => {
     try {
         presetIds.value = await api.listPresetIds()
-    } catch {
-        // 静默失败，用户仍可手动输入
+        presetLoadError.value =
+            presetIds.value.length === 0
+                ? '没有读取到预设 ID，请确认 ChatLuna 或 Character 已加载'
+                : ''
+        if (presetId.value.length === 0) {
+            presetId.value = preferredPreset()
+        }
+    } catch (error) {
+        presetIds.value = []
+        presetLoadError.value = `读取预设 ID 失败：${toErrorMessage(error)}`
     }
 }
 
@@ -816,15 +847,27 @@ const onPresetAction = async (command: string) => {
     }
 }
 
+watch(presetId, (value) => {
+    const id = value.trim()
+    if (id.length > 0) {
+        window.localStorage.setItem(PRESET_STORAGE_KEY, id)
+    } else {
+        window.localStorage.removeItem(PRESET_STORAGE_KEY)
+    }
+})
+
 watch(activeTab, () => {
     void refreshActiveTab()
 })
 
 let statusRefreshTimer = 0
 
-onMounted(() => {
-    fetchPresetIds()
-    fetchConfigStatus()
+onMounted(async () => {
+    await fetchPresetIds()
+    if (presetId.value.length > 0) {
+        await refreshAll(true)
+    }
+    await fetchConfigStatus()
     statusRefreshTimer = window.setInterval(fetchConfigStatus, 5_000)
 })
 

@@ -148,7 +148,7 @@ presetId, platform, platformUserId, canonicalSpeakerKey, confidence, source, cre
 
 已在 `0.1.2` 本机实例完成：
 
-- `GET /foxy-memory/health` 返回 `service=chatluna-foxy-memory`、`preset=foxy3（Character）`；
+- `GET /foxy-memory/health` 返回 `service=chatluna-foxy-memory`、`preset=<你的预设>（Character）`；
 - `POST /foxy-memory/list|search|context` 返回真实记忆，`/search` 返回微博命中；
 - `GET /foxy-memory/export` 导出 682 条现有记忆；
 - 身份合并 Console 对话框可打开，支持已有账号搜索、平台/账号 ID 添加、移除确认；
