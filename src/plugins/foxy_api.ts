@@ -104,6 +104,27 @@ export function apply(ctx: Context, config: LivingMemoryConfig) {
             }
         })
 
+        const listPresets = async (koa: any) => {
+            const token = String(koa.headers.authorization ?? '').replace(
+                /^Bearer\s+/iu,
+                ''
+            )
+            if (!authorized(config, token, koa.req?.socket?.remoteAddress)) {
+                koa.status = 401
+                koa.body = { ok: false, error: 'unauthorized' }
+                return
+            }
+            const presets = await service().listPresetIds()
+            koa.body = {
+                ok: true,
+                presets,
+                defaultPreset: defaultPreset(config)
+            }
+        }
+
+        ctx.server.get('/foxy-memory/presets', listPresets)
+        ctx.server.post('/foxy-memory/presets', listPresets)
+
         ctx.server.post('/foxy-memory/record', async (koa: any) => {
             const token = String(koa.headers.authorization ?? '').replace(
                 /^Bearer\s+/iu,
